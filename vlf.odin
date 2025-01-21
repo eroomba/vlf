@@ -263,37 +263,37 @@ vlf_build_tex_cache :: proc() {
 	base_c1:rl.Color = { 200, 200, 200, t1 }
 
 	// A base
-	c_txt = rl.LoadTexture("./assets/base/A.png")
+	c_txt = rl.LoadTexture("./images/base/A.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.Animal"] = c_txt
 
 	// B base
-	c_txt = rl.LoadTexture("./assets/base/B.png")
+	c_txt = rl.LoadTexture("./images/base/B.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.B"] = c_txt
 
 	// G base
-	c_txt = rl.LoadTexture("./assets/base/G.png")
+	c_txt = rl.LoadTexture("./images/base/G.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.G"] = c_txt
 
 	// D base
-	c_txt = rl.LoadTexture("./assets/base/D.png")
+	c_txt = rl.LoadTexture("./images/base/D.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.D"] = c_txt
 	
 	// U base
-	c_txt = rl.LoadTexture("./assets/base/U.png")
+	c_txt = rl.LoadTexture("./images/base/U.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.U"] = c_txt
 
 	// X base
-	c_txt = rl.LoadTexture("./assets/base/X.png")
+	c_txt = rl.LoadTexture("./images/base/X.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["base.X"] = c_txt
@@ -306,19 +306,19 @@ vlf_build_tex_cache :: proc() {
 	h_cn_op:u8 = 100
 
 	// Animal Husk
-	c_txt = rl.LoadTexture("./assets/husk/ANM.png")
+	c_txt = rl.LoadTexture("./images/husk/ANM.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["husk.Animal"] = c_txt
 
 	// Vegetable Husk
-	c_txt = rl.LoadTexture("./assets/husk/VGT.png")
+	c_txt = rl.LoadTexture("./images/husk/VGT.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["husk.Vegetable"] = c_txt
 
 	// Synthetic Husk
-	c_txt = rl.LoadTexture("./assets/husk/SYN.png")
+	c_txt = rl.LoadTexture("./images/husk/SYN.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["husk.Synthetic"] = c_txt
@@ -331,19 +331,19 @@ vlf_build_tex_cache :: proc() {
 	p_cn_op:u8 = 100
 
 	// Animal Proto base
-	c_txt = rl.LoadTexture("./assets/proto/ANM.png")
+	c_txt = rl.LoadTexture("./images/proto/ANM.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["proto.Animal"] = c_txt
 
 	// Vegetable Proto base
-	c_txt = rl.LoadTexture("./assets/proto/VGT.png")
+	c_txt = rl.LoadTexture("./images/proto/VGT.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["proto.Vegetable"] = c_txt
 
 	// Synthetic Proto base
-	c_txt = rl.LoadTexture("./assets/proto/SYN.png")
+	c_txt = rl.LoadTexture("./images/proto/SYN.png")
 	rl.GenTextureMipmaps(&c_txt);
 	rl.SetTextureFilter(c_txt, filter); 
 	vlf_tex_cache["proto.Synthetic"] = c_txt
