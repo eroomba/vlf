@@ -8,14 +8,19 @@ import rl "vendor:raylib"
 import "core:math/rand"
 
 vlf_items := make(map[string]vlf_item)
+vlf_objects := make(map[string]vlf_object)
 vlf_step:int = 0
 vlf_idseed:int = 0
 
 vlf_tex_cache := make(map[string]rl.Texture2D)
 
+vlf_players := make(map[string]vlf_player)
+
 vlf_init :: proc() {
 
 	vlf_build_tex_cache()
+
+	vlf_init_players()
 
 	bases := []string{"A","B","G","D","U","X"}
 
@@ -33,70 +38,22 @@ vlf_init :: proc() {
 			vlf_items[new_id] = new_item
 		}
 	}
+}
 
-	for i := 0; i < 0; i += 1 {
-		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
-		vlf_idseed += 1
-		new_vars := make(map[string]f32)
-		new_code := ""
-		h_src := vlf_src.SYN
-		if i < 3 {
-			h_src = vlf_src.ANM
-		} else if i < 6 {
-			h_src = vlf_src.VGT
-		}
-		new_ang := rand.float32() * 360
-		new_r := rand.float32() * active_r
-		new_x := active_x + (new_r * mth.cos(new_ang * 3.14159 / 180))
-		new_y := active_y + (new_r * mth.sin(new_ang * 3.14159 / 180))
-		new_item := init_item(new_id, h_src, vlf_kind.HUSK, {f32(new_x), f32(new_y)}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
-		vlf_items[new_id] = new_item
-	}
-
-	{
-		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
-		vlf_idseed += 1
-		new_vars := make(map[string]f32)
-		new_code := "AAA"
-		new_ang := rand.float32() * 360
-		new_r := rand.float32() * active_r
-		new_x := active_x + (new_r * mth.cos(new_ang * 3.14159 / 180))
-		new_y := active_y + (new_r * mth.sin(new_ang * 3.14159 / 180))
-		new_item := init_item(new_id, vlf_src.ANM, vlf_kind.PROTO, {f32(new_x), f32(new_y)}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
-		vlf_items[new_id] = new_item
-	}
-
-	{
-		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
-		vlf_idseed += 1
-		new_vars := make(map[string]f32)
-		new_code := ""
-		new_ang := rand.float32() * 360
-		new_r := rand.float32() * active_r
-		new_x := active_x + (new_r * mth.cos(new_ang * 3.14159 / 180))
-		new_y := active_y + (new_r * mth.sin(new_ang * 3.14159 / 180))
-		new_item := init_item(new_id, vlf_src.VGT, vlf_kind.PROTO, {f32(new_x), f32(new_y)}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
-		vlf_items[new_id] = new_item
-	}
-
-	{
-		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
-		vlf_idseed += 1
-		new_vars := make(map[string]f32)
-		new_code := "AAAB"
-		new_ang := rand.float32() * 360
-		new_r := rand.float32() * active_r
-		new_x := active_x + (new_r * mth.cos(new_ang * 3.14159 / 180))
-		new_y := active_y + (new_r * mth.sin(new_ang * 3.14159 / 180))
-		new_item := init_item(new_id, vlf_src.SYN, vlf_kind.PROTO, {f32(new_x), f32(new_y)}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
-		vlf_items[new_id] = new_item
-	}
+vlf_init_players :: proc() {
+	p_id:string = "player1"
+	p1 := vlf_init_player(p_id, "Player 1", rl.GetColor(0x00CC00FF))
+	vlf_players[p_id] = p1
 }
 
 vlf_run :: proc() {
 
-	for itemID in vlf_items {
-		vlf_run_item(&vlf_items[itemID])
+	for player_id in vlf_players {
+		vlf_run_player(&vlf_players[player_id])
+	}
+
+	for item_if in vlf_items {
+		vlf_run_item(&vlf_items[item_id])
 	}
 
 	vlf_step += 1
@@ -105,11 +62,24 @@ vlf_run :: proc() {
 vlf_draw :: proc() {
 	rl.DrawTexture(vlf_tex_cache["main.bg"], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
 
-	for itemID in vlf_items {
-		if (vlf_items[itemID].status == .ACTIVE) {
-			vlf_draw_item(&vlf_items[itemID])
+	for item_id in vlf_items {
+		if (vlf_items[item_id].status == .ACTIVE) {
+			vlf_draw_item(&vlf_items[item_id])
 		}
 	}
+
+	p_key := "item.Pipet"
+	pW := f32(vlf_tex_cache[p_key].width)
+	pH := f32(vlf_tex_cache[p_key].height)
+	pdW:f32 = 25
+	pRatio := pdW / pW
+	ptW := pW * pRatio
+	ptH := pH
+	pX := vlf_objects["pipet"].pos.x
+	pY := vlf_objects["pipet"].pos.y + (ptH * 0.98)
+	pR := vlf_objects["pipet"].vel.y
+	
+	rl.DrawTexturePro(vlf_tex_cache[p_key], { 0, 0, pW, pH }, { pX, pY, ptW, ptH}, {(ptW / 2), (ptH * 0.98)}, 0, rl.WHITE)
 
 	rl.DrawTexturePro(vlf_tex_cache["overlay.main"], { 0, 0, screen_width * 2, screen_height * 2 }, { 0, 0, screen_width, screen_height}, {0, 0}, 0, rl.WHITE)
 }
@@ -252,10 +222,17 @@ vlf_build_tex_cache :: proc() {
 	rl.ImageDrawRectangle(&c_img, 0, i32(screen_height - 200), 300, 200, { 100, 100, 100, 200 })
 	rl.ImageDrawRectangle(&c_img, i32(screen_width - 300), i32(screen_height - 200), 300, 200, { 100, 100, 100, 200 })
 	c_txt = rl.LoadTextureFromImage(c_img)
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["overlay.panels"] = c_txt
 	rl.UnloadImage(c_img)
+
+	// ITEMS
+
+	c_txt = rl.LoadTexture("./images/items/pipet.png")
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
+	vlf_tex_cache["item.Pipet"] = c_txt
 
 
 	// BASES
@@ -264,38 +241,38 @@ vlf_build_tex_cache :: proc() {
 
 	// A base
 	c_txt = rl.LoadTexture("./images/base/A.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.Animal"] = c_txt
 
 	// B base
 	c_txt = rl.LoadTexture("./images/base/B.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.B"] = c_txt
 
 	// G base
 	c_txt = rl.LoadTexture("./images/base/G.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.G"] = c_txt
 
 	// D base
 	c_txt = rl.LoadTexture("./images/base/D.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.D"] = c_txt
 	
 	// U base
 	c_txt = rl.LoadTexture("./images/base/U.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.U"] = c_txt
 
 	// X base
 	c_txt = rl.LoadTexture("./images/base/X.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["base.X"] = c_txt
 
 
@@ -307,20 +284,20 @@ vlf_build_tex_cache :: proc() {
 
 	// Animal Husk
 	c_txt = rl.LoadTexture("./images/husk/ANM.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["husk.Animal"] = c_txt
 
 	// Vegetable Husk
 	c_txt = rl.LoadTexture("./images/husk/VGT.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["husk.Vegetable"] = c_txt
 
 	// Synthetic Husk
 	c_txt = rl.LoadTexture("./images/husk/SYN.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["husk.Synthetic"] = c_txt
 
 
@@ -332,19 +309,19 @@ vlf_build_tex_cache :: proc() {
 
 	// Animal Proto base
 	c_txt = rl.LoadTexture("./images/proto/ANM.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["proto.Animal"] = c_txt
 
 	// Vegetable Proto base
 	c_txt = rl.LoadTexture("./images/proto/VGT.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["proto.Vegetable"] = c_txt
 
 	// Synthetic Proto base
 	c_txt = rl.LoadTexture("./images/proto/SYN.png")
-	rl.GenTextureMipmaps(&c_txt);
-	rl.SetTextureFilter(c_txt, filter); 
+	rl.GenTextureMipmaps(&c_txt)
+	rl.SetTextureFilter(c_txt, filter)
 	vlf_tex_cache["proto.Synthetic"] = c_txt
 }
