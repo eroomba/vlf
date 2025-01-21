@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="300"
+   height="150"
+   viewBox="0 0 79.374998 39.6875"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4 (86a8ad7, 2024-10-11)"
+   sodipodi:docname="proto_ANM.svg"
+   inkscape:export-filename="proto\ANM.png"
+   inkscape:export-xdpi="72"
+   inkscape:export-ydpi="72"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="false"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="px"
+     inkscape:zoom="1.3763619"
+     inkscape:cx="81.01067"
+     inkscape:cy="160.93151"
+     inkscape:window-width="1920"
+     inkscape:window-height="1017"
+     inkscape:window-x="1912"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <linearGradient
+       id="linearGradient1"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#ccffff;stop-opacity:1;"
+         offset="0.52737755"
+         id="stop1" />
+      <stop
+         style="stop-color:#66ffff;stop-opacity:1;"
+         offset="1"
+         id="stop2" />
+    </linearGradient>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1"
+       id="radialGradient2"
+       cx="39.6875"
+       cy="39.6875"
+       fx="39.6875"
+       fy="39.6875"
+       r="39.6875"
+       gradientTransform="scale(1,0.50000001)"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <g
+     inkscape:label="proto.ANM"
+     inkscape:groupmode="layer"
+     id="layer1"
+     style="display:inline">
+    <path
+       id="path1"
+       style="fill:url(#radialGradient2);stroke:#00eeee;stroke-width:3.175;stroke-linecap:square;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none"
+       d="M 20.115582,1.5875 A 18.528081,18.256249 0 0 0 1.5875,19.843749 18.528081,18.256249 0 0 0 20.115582,38.1 18.528081,18.256249 0 0 0 21.159418,38.02667 V 38.1 H 58.215581 V 38.02667 A 18.528081,18.256249 0 0 0 59.259417,38.1 18.528081,18.256249 0 0 0 77.787499,19.843749 18.528081,18.256249 0 0 0 59.259417,1.5875 18.528081,18.256249 0 0 0 58.215581,1.66082 V 1.5875 H 21.159418 V 1.61914 A 18.528081,18.256249 0 0 0 20.115582,1.5875 Z" />
+  </g>
+</svg>

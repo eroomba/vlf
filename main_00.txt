@@ -1,0 +1,59 @@
+package vlf
+
+import "core:fmt"
+import "core:strings"
+import "core:strconv"
+import mth "core:math"
+import rl "vendor:raylib"
+import "core:math/rand"
+
+screen_width:f32 = 1280
+screen_height: f32 = 720
+
+frame_rate:f32 = 400
+delta:f32 = 0
+
+main :: proc() {
+
+	rl.SetConfigFlags({ .VSYNC_HINT })
+	rl.InitWindow(i32(screen_width), i32(screen_height), "VLF")
+	rl.SetTargetFPS(500)
+
+	vlf_init()
+
+	bg_c1 := rl.GetColor(0xCCFFFFFF)
+	bg_c2 := rl.GetColor(0x33FFFFFF)
+	bg_tint := rl.GetColor(0xFFFFFFFF)
+	bg_img := rl.GenImageGradientRadial(i32(screen_width * 2), i32(screen_height * 2), 0.2, bg_c1, bg_c2)
+	bg := rl.LoadTextureFromImage(bg_img)
+	rl.UnloadImage(bg_img)
+
+    for !rl.WindowShouldClose() {
+		delta += rl.GetFrameTime()
+		runStep := false
+
+		if delta >= 1 / frame_rate {
+			delta = 0
+			runStep = true
+		}
+		
+		if (runStep) {
+			vlf_run()
+		}
+
+		{
+			rl.BeginDrawing()
+			
+			rl.ClearBackground(rl.BLACK)
+			rl.DrawTexture(bg, i32(-1 * screen_width / 2), i32(-1 * screen_height / 2), bg_tint)
+
+			vlf_draw()
+
+			rl.EndDrawing()
+		}
+	}
+	rl.CloseWindow()
+
+}
+
+

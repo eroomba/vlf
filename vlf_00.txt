@@ -1,0 +1,350 @@
+package vlf
+
+import "core:fmt"
+import "core:strings"
+import "core:strconv"
+import mth "core:math"
+import rl "vendor:raylib"
+import "core:math/rand"
+
+vlf_items := make(map[string]vlf_item)
+vlf_step:int = 0
+vlf_idseed:int = 0
+
+vlf_tex_cache := make(map[string]rl.Texture2D)
+
+vlf_init :: proc() {
+
+	vlf_build_tex_cache()
+
+	bases := []string{"A","B","G","D","U","X"}
+
+	for base in bases {
+		for i := 0; i < 10; i += 1 {
+			new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
+			vlf_idseed += 1
+			new_vars := make(map[string]f32)
+			new_code := base
+			new_item := init_item(new_id, vlf_src.NAT, vlf_kind.BASE, {screen_width * rand.float32(), screen_height * rand.float32()}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
+			vlf_items[new_id] = new_item
+		}
+	}
+
+	for i := 0; i < 10; i += 1 {
+		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
+		vlf_idseed += 1
+		new_vars := make(map[string]f32)
+		new_code := ""
+		h_src := vlf_src.SYN
+		if i < 3 {
+			h_src = vlf_src.ANM
+		} else if i < 6 {
+			h_src = vlf_src.VGT
+		}
+		new_item := init_item(new_id, h_src, vlf_kind.HUSK, {screen_width * rand.float32(), screen_height * rand.float32()}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
+		vlf_items[new_id] = new_item
+	}
+
+	{
+		new_id := strings.concatenate({"item", int_to_str(vlf_idseed)})
+		vlf_idseed += 1
+		new_vars := make(map[string]f32)
+		new_code := "AAA"
+		new_item := init_item(new_id, vlf_src.ANM, vlf_kind.PROTO, {screen_width * rand.float32(), screen_height * rand.float32()}, {0.1,360 * rand.float32()}, new_vars, code=new_code)
+		vlf_items[new_id] = new_item
+	}
+}
+
+vlf_run :: proc() {
+
+	for itemID in vlf_items {
+		vlf_run_item(&vlf_items[itemID])
+	}
+
+	vlf_step += 1
+}
+
+vlf_draw :: proc() {
+	for itemID in vlf_items {
+		if (vlf_items[itemID].status == .ACTIVE) {
+			vlf_draw_item(&vlf_items[itemID])
+		}
+	}
+
+	rl.DrawTexturePro(vlf_tex_cache["overlay.panels"], { 0, 0, screen_width, screen_height }, { 0, 0, screen_width, screen_height}, {1, 1}, 0, rl.WHITE)
+}
+
+vlf_run_item :: proc(item:^vlf_item) {
+
+	if item.status == .ACTIVE {
+
+		vlf_run_codes(item)
+
+		vlf_move_item(item)
+
+	}
+}
+
+vlf_move_item :: proc(item:^vlf_item) {
+
+	if item.vel.x == 0 {
+		item^.vel.x = item.weight * 0.01
+		//item^.vel.y = 360 * rand.float32()
+	} else {
+		item^.vel.y += f32(1 - int(3 * rand.float32()))
+	}
+
+	if item.vel.y > 360 {
+		item^.vel.y -= 360
+	} else if item.vel.y < 0 {
+		item^.vel.y += 360
+	}
+
+	if item.vel.x != 0 {
+		moveLen := item.vel.x
+		dX := moveLen * mth.cos(item.vel.y * 3.14159 / 180)
+		dY := moveLen * mth.sin(item.vel.y * 3.14159 / 180)
+		rc := false
+
+		if item.pos.x + dX < 0 || item.pos.x + dX > screen_width {
+			dX *= -1
+			rc = true
+		}
+		if item.pos.y + dY < 0 || item.pos.y + dY > screen_height {
+			dY *= -1
+			rc = true
+		}
+
+		item^.pos.x += dX
+		item^.pos.y += dY
+
+		if rc == true {
+			nDir := mth.atan2(dY, dX) * 180 / 3.14159
+			item^.vel.y = nDir
+		}
+	}
+
+	item^.vel.x *= 1 / item.weight
+	if item.vel.x < 0.01 {
+		item^.vel.x = 0
+	}
+}
+
+vlf_draw_item :: proc(item:^vlf_item) {
+	i_tint := rl.GetColor(0xFFFFFFFF)
+	rot:f32 = 0
+	scl:f32 = 0.5
+
+	switch item.kind {
+		case .EMPTY:
+		case .BASE:
+			rot = item.vel.y 
+			base_key := strings.concatenate({"base.",item.code})
+			txW:f32 = f32(vlf_tex_cache[base_key].width)
+			txH:f32 = f32(vlf_tex_cache[base_key].height)
+			tW:f32 = 11
+			tH:f32 = 11
+			tX:f32 = item.pos.x //- (tW / 4)
+			tY:f32 = item.pos.y //- (tH / 4)
+			rl.DrawTexturePro(vlf_tex_cache[base_key], { 0, 0, txW, txH }, { tX, tY, tW, tH }, {tW/2, tH/2}, rot, i_tint)
+		case .CODE:
+		case .STRAND:
+		case .PROTO:
+			proto_key := strings.concatenate({"proto.",vlf_src_name(item.src)})
+			txW:f32 = f32(vlf_tex_cache[proto_key].width)
+			txH:f32 = f32(vlf_tex_cache[proto_key].height)
+			tW:f32 = 31
+			tH:f32 = 31
+			tX:f32 = item.pos.x
+			tY:f32 = item.pos.y
+			rl.DrawTexturePro(vlf_tex_cache[proto_key], { 0, 0, txW, txH }, { tX, tY, tW, tH}, {tW/2, tH/2}, rot, i_tint)
+		case .HUSK:
+			husk_key := strings.concatenate({"husk.",vlf_src_name(item.src)})
+			txW:f32 = f32(vlf_tex_cache[husk_key].width)
+			txH:f32 = f32(vlf_tex_cache[husk_key].height)
+			tW:f32 = 15
+			tH:f32 = 15
+			tX:f32 = item.pos.x
+			tY:f32 = item.pos.y
+			rl.DrawTexturePro(vlf_tex_cache[husk_key], { 0, 0, txW, txH }, { tX, tY, tW, tH}, {tW/2, tH/2}, rot, i_tint)
+		case .EXTRA:
+	}
+
+
+}
+
+vlf_build_tex_cache :: proc() {
+	c_img:rl.Image
+	c_txt:rl.Texture2D
+	filter := rl.TextureFilter.BILINEAR
+	line_width:i32 = 2
+	t1:u8 = 200
+
+	c_img = rl.GenImageColor(i32(screen_width), i32(screen_height), rl.BLANK)
+	rl.ImageDrawRectangle(&c_img, 0, i32(screen_height - 200), 300, 200, { 100, 100, 100, 200 })
+	rl.ImageDrawRectangle(&c_img, i32(screen_width - 300), i32(screen_height - 200), 300, 200, { 100, 100, 100, 200 })
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["overlay.panels"] = c_txt
+	rl.UnloadImage(c_img)
+
+
+	// BASES
+
+	base_c1:rl.Color = { 200, 200, 200, t1 }
+
+	// A base
+	base_c1 = {255, 200, 200, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	rl.ImageDrawCircleV(&c_img, {15,10}, 5, base_c1)
+	rl.ImageDrawLineEx(&c_img, {20,10}, {1,5}, line_width, base_c1)
+	rl.ImageDrawLineEx(&c_img, {20,10}, {1,15}, line_width, base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.A"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// B base
+	base_c1 = {200, 255, 200, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	rl.ImageDrawLineEx(&c_img, {1,10}, {15,10}, line_width, base_c1)
+	rl.ImageDrawCircleV(&c_img, {5,10}, 4, base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {15,10}, 4, base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.B"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// G base
+	base_c1 = {200, 200, 255, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	rl.ImageDrawCircleLinesV(&c_img, {10,10}, 8, base_c1)
+	rl.ImageDrawCircleV(&c_img, {10,10}, 4, base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.G"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// D base
+	base_c1 = {255, 200, 255, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	c_rad:f32 = 5
+	d_xy:f32 = mth.sqrt(((c_rad * 2)*(c_rad * 2)) - (c_rad * c_rad))
+	d_xy *= 0.5
+	rl.ImageDrawCircleLinesV(&c_img, {10, 10 - d_xy}, i32(c_rad), base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {10 - d_xy, 10 + d_xy}, i32(c_rad), base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {10 + d_xy, 10 + d_xy}, i32(c_rad), base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.D"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// U base
+	base_c1 = {200, 255, 255, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	rl.ImageDrawCircleLinesV(&c_img, {0, 0}, 11, base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {0, 21}, 11, base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {21, 0}, 11, base_c1)
+	rl.ImageDrawCircleLinesV(&c_img, {21, 21}, 11, base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.U"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// X base
+	base_c1 = {255, 220, 200, t1}
+	c_img = rl.GenImageColor(21, 21, rl.BLANK)
+	rl.ImageDrawCircleLinesV(&c_img, {10, 10}, 6, base_c1)
+	rl.ImageDrawLineEx(&c_img, {3,3}, {18,18}, line_width, base_c1)
+	rl.ImageDrawLineEx(&c_img, {18,3}, {3,18}, line_width, base_c1)
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["base.X"] = c_txt
+	rl.UnloadImage(c_img)
+
+
+	// HUSKS
+
+	h_ln_w:i32 = 6
+	h_ln_op:u8 = 100
+	h_cn_op:u8 = 100
+
+	// Animal Husk
+	c_img = rl.GenImageColor(35, 35, rl.BLANK)
+    rl.ImageDrawCircleV(&c_img, {17,17}, 17, {255, 200, 200, h_cn_op })
+	for l:i32 = 17; l > 17 - h_ln_w; l -= 1 {
+		rl.ImageDrawCircleLinesV(&c_img, {17,17}, l, {200, 100, 100, h_ln_op})
+	}
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["husk.Animal"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// Vegetable Husk
+	c_img = rl.GenImageColor(35, 35, rl.BLANK)
+    rl.ImageDrawCircleV(&c_img, {17,17}, 17, {150, 255, 150, h_cn_op })
+	for l:i32 = 17; l > 17 - h_ln_w; l -= 1 {
+		rl.ImageDrawCircleLinesV(&c_img, {17,17}, l, {100, 200, 100, h_ln_op})
+	}
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["husk.Vegetable"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// Synthetic Husk
+	c_img = rl.GenImageColor(35, 35, rl.BLANK)
+    rl.ImageDrawCircleV(&c_img, {17,17}, 17, { 200, 200, 240, h_cn_op })
+	for l:i32 = 17; l > 17 - h_ln_w; l -= 1 {
+		rl.ImageDrawCircleLinesV(&c_img, {17,17}, l, { 120, 120, 180, h_ln_op})
+	}
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["husk.Synthetic"] = c_txt
+	rl.UnloadImage(c_img)
+
+
+	// PROTOS
+
+	p_ln_w:i32 = 6
+	p_ln_op:u8 = 200
+	p_cn_op:u8 = 180
+
+	// Animal Proto base
+	c_img = rl.GenImageColor(61, 61, rl.BLANK)
+	rl.ImageDrawCircleV(&c_img, {16, 30}, 15, {200, 100, 100, p_ln_op})
+	rl.ImageDrawCircleV(&c_img, {44, 30}, 15, {200, 100, 100, p_ln_op})
+	rl.ImageDrawRectangleV(&c_img, {30,16}, {30,30}, {200, 100, 100, p_ln_op}); 
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["proto.Animal"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// Vegetable Proto base
+	c_img = rl.GenImageColor(61, 61, rl.BLANK)
+
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["proto.Vegetable"] = c_txt
+	rl.UnloadImage(c_img)
+
+	// Synthetic Proto base
+	c_img = rl.GenImageColor(61, 61, rl.BLANK)
+
+	c_txt = rl.LoadTextureFromImage(c_img)
+	rl.GenTextureMipmaps(&c_txt);
+	rl.SetTextureFilter(c_txt, filter); 
+	vlf_tex_cache["proto.Synthetic"] = c_txt
+	rl.UnloadImage(c_img)
+}
