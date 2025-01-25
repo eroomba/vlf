@@ -10,14 +10,6 @@ import "core:math/rand"
 screen_width:f32 = 1280
 screen_height: f32 = 720
 
-active_width:f32 = screen_height
-active_height:f32 = screen_height
-active_padding:f32 = 50
-active_r:f32 = (screen_height / 2) - active_padding
-active_x:f32 = active_r + active_padding
-active_y:f32 = active_r + active_padding
-active_c:rl.Vector2 = { active_x, active_y }
-
 frame_rate:f32 = 400
 delta:f32 = 0
 
@@ -26,8 +18,6 @@ main :: proc() {
 	rl.SetConfigFlags({ .VSYNC_HINT })
 	rl.InitWindow(i32(screen_width), i32(screen_height), "VLF")
 	rl.SetTargetFPS(500)
-
-	vlf_init()
 
     for !rl.WindowShouldClose() {
 		delta += rl.GetFrameTime()
@@ -39,15 +29,14 @@ main :: proc() {
 		}
 		
 		if (runStep) {
-			vlf_run()
+			// run game step
 		}
 
 		{
 			rl.BeginDrawing()
-			
 			rl.ClearBackground(rl.BLACK)
 
-			vlf_draw()
+			// draw game step
 
 			rl.EndDrawing()
 		}
