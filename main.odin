@@ -10,16 +10,63 @@ import "core:math/rand"
 screen_width:f32 = 1280
 screen_height: f32 = 720
 
+active_width:f32 = screen_width
+active_height:f32 = screen_height
+
 frame_rate:f32 = 400
 delta:f32 = 0
 
-main :: proc() {
+mouse_button_state := []int{0,0}
+mouse_button_timer := []int{0,0}
 
+main :: proc() {
+	rl.SetTraceLogLevel(rl.TraceLogLevel.NONE)
 	rl.SetConfigFlags({ .VSYNC_HINT })
 	rl.InitWindow(i32(screen_width), i32(screen_height), "VLF")
 	rl.SetTargetFPS(500)
+	defer rl.CloseWindow()
+
+	vlf_init()
+	defer vlf_end()
 
     for !rl.WindowShouldClose() {
+		if mouse_button_timer[0] > 0 {
+			mouse_button_timer[0] -= 1
+		}
+		if mouse_button_timer[1] > 0 {
+			mouse_button_timer[1] -= 1
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT_CONTROL) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_CONTROL) {
+			vlf_set_flags += { .EnvironmentDisplay }
+		} else {
+			vlf_set_flags -= { .EnvironmentDisplay }
+		}
+
+        if rl.IsKeyDown(rl.KeyboardKey.LEFT_SHIFT) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_SHIFT) {
+			vlf_set_flags += { .ItemDisplay }
+		} else {
+			vlf_set_flags -= { .ItemDisplay }
+		}
+
+		vlf_mouse_pos = rl.GetMousePosition()
+
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			vlf_click({vlf_mouse_pos.x, vlf_mouse_pos.y}, vlf_set_flags)
+		
+			if mouse_button_timer[0] > 0 {
+				inject_at(&vlf_events, 0, VLF_Event{
+					e_type = .Puff,
+					pos = vlf_mouse_pos
+				})
+			}
+
+		}
+
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			mouse_button_timer[0] = 10
+		}
+
 		delta += rl.GetFrameTime()
 		runStep := false
 
@@ -30,6 +77,9 @@ main :: proc() {
 		
 		if (runStep) {
 			// run game step
+			if runStep {
+				vlf_run()
+			}
 		}
 
 		{
@@ -37,11 +87,11 @@ main :: proc() {
 			rl.ClearBackground(rl.BLACK)
 
 			// draw game step
+			vlf_draw()
 
 			rl.EndDrawing()
 		}
 	}
-	rl.CloseWindow()
 
 }
 
