@@ -34,8 +34,8 @@ vlf_build_hash :: proc() {
             })
         }
     }
-    for e_id in vlf_elements {
-        vlf_hash_add(&vlf_elements[e_id])
+    for &elem in vlf_elems {
+        vlf_hash_add(&elem)
     }
 }
 
@@ -47,8 +47,8 @@ vlf_hash_add :: proc(elem:^VLF_Element) {
     } 
 }
 
-vlf_hash_find :: proc(elem:^VLF_Element, e_types:bit_set[VLF_Element_Type] = {}) -> [dynamic]string {
-    found := make([dynamic]string)
+vlf_hash_find :: proc(elem:^VLF_Element, e_types:bit_set[VLF_Element_Type] = {}) -> [dynamic]^VLF_Element {
+    found := make([dynamic]^VLF_Element)
 
     col:f32 = mth.floor(elem^.pos.x / hash_hw)
     row:f32 = mth.floor(elem^.pos.y / hash_hw)
@@ -88,7 +88,7 @@ vlf_hash_find :: proc(elem:^VLF_Element, e_types:bit_set[VLF_Element_Type] = {})
                 if chk^.id != elem^.id && chk.status == .Active && (card(e_types) == 0 || chk^.core.e_type in e_types) {
                     dist := rl.Vector2Distance(elem^.pos, chk^.pos)
                     if dist < elem^.core.range {
-                        append(&found, chk^.id)
+                        append(&found, &(chk^))
                     }
                 }
             }
@@ -98,8 +98,8 @@ vlf_hash_find :: proc(elem:^VLF_Element, e_types:bit_set[VLF_Element_Type] = {})
     return found
 }
 
-vlf_hash_find_2 :: proc(pos:rl.Vector2, range:f32) -> [dynamic]string  {
-    found := make([dynamic]string)
+vlf_hash_find_2 :: proc(pos:rl.Vector2, range:f32) -> [dynamic]^VLF_Element {
+    found := make([dynamic]^VLF_Element)
 
     col:f32 = mth.floor(pos.x / hash_hw)
     row:f32 = mth.floor(pos.y / hash_hw)
@@ -139,7 +139,7 @@ vlf_hash_find_2 :: proc(pos:rl.Vector2, range:f32) -> [dynamic]string  {
                 if chk.status == .Active {
                     dist := rl.Vector2Distance(pos, chk^.pos)
                     if dist < range {
-                        append(&found, chk^.id)
+                        append(&found, &(chk^))
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package vlf
 
 import "core:fmt"
+import mem "core:mem"
 import "core:strings"
 import rl "vendor:raylib"
 import mth "core:math"
@@ -13,12 +14,12 @@ haze_h:f32 = active_height / haze_rows
 
 VLF_Haze_Node :: struct {
     pos:rl.Vector2,
-    nodes:map[string]int
+    nodes:[16]int
 }
 
 VLF_Haze_Formula :: struct {
-    part1:string,
-    part2:string,
+    part1:int,
+    part2:int,
     result_type:VLF_Element_Type,
     result_sub_type:string
 }
@@ -26,14 +27,14 @@ VLF_Haze_Formula :: struct {
 vlf_haze := make([dynamic]VLF_Haze_Node)
 
 vlf_haze_formulas := []VLF_Haze_Formula{
-    VLF_Haze_Formula{ part1 = "a1", part2 = "a2", result_type = .Ort, result_sub_type = "A"},
-    VLF_Haze_Formula{ part1 = "b1", part2 = "b2", result_type = .Ort, result_sub_type = "B"},
-    VLF_Haze_Formula{ part1 = "g1", part2 = "g2", result_type = .Ort, result_sub_type = "G"},
-    VLF_Haze_Formula{ part1 = "d1", part2 = "d2", result_type = .Ort, result_sub_type = "D"},
-    VLF_Haze_Formula{ part1 = "d1", part2 = "x", result_type = .Ort, result_sub_type = "P"},
-    VLF_Haze_Formula{ part1 = "d2", part2 = "x", result_type = .Ort, result_sub_type = "E"},
-    VLF_Haze_Formula{ part1 = "u1", part2 = "u2", result_type = .Ort, result_sub_type = "U"},
-    VLF_Haze_Formula{ part1 = "v", part2 = "x", result_type = .Ort, result_sub_type = "I"},
+    VLF_Haze_Formula{ part1 = spki("a1"), part2 = spki("a2"), result_type = .Ort, result_sub_type = "A"},
+    VLF_Haze_Formula{ part1 = spki("b1"), part2 = spki("b2"), result_type = .Ort, result_sub_type = "B"},
+    VLF_Haze_Formula{ part1 = spki("g1"), part2 = spki("g2"), result_type = .Ort, result_sub_type = "G"},
+    VLF_Haze_Formula{ part1 = spki("d1"), part2 = spki("d2"), result_type = .Ort, result_sub_type = "D"},
+    VLF_Haze_Formula{ part1 = spki("d1"), part2 = spki("x"), result_type = .Ort, result_sub_type = "P"},
+    VLF_Haze_Formula{ part1 = spki("d2"), part2 = spki("x"), result_type = .Ort, result_sub_type = "E"},
+    VLF_Haze_Formula{ part1 = spki("u1"), part2 = spki("u2"), result_type = .Ort, result_sub_type = "U"},
+    VLF_Haze_Formula{ part1 = spki("v"), part2 = spki("x"), result_type = .Ort, result_sub_type = "I"},
 }
 
 vlf_init_haze :: proc() {
@@ -47,14 +48,14 @@ vlf_init_haze :: proc() {
             })
             curr_idx := len(vlf_haze) - 1
             for spk in singles {
-                (&vlf_haze[curr_idx])^.nodes[spk] = 1
+                (&vlf_haze[curr_idx])^.nodes[spki(spk)] = 1
             }
-            (&vlf_haze[curr_idx])^.nodes["d1"] = 2 + int(rand.float32() * 3)
-            (&vlf_haze[curr_idx])^.nodes["d2"] = 2 + int(rand.float32() * 3)
-            (&vlf_haze[curr_idx])^.nodes["x"] = 3
-            (&vlf_haze[curr_idx])^.nodes["o1"] = 20 + int(rand.float32() * 41)
-            (&vlf_haze[curr_idx])^.nodes["o2"] = 20 + int(rand.float32() * 41)
-            (&vlf_haze[curr_idx])^.nodes["o3"] = 20 + int(rand.float32() * 41)
+            (&vlf_haze[curr_idx])^.nodes[spki("d1")] = 2 + int(rand.float32() * 3)
+            (&vlf_haze[curr_idx])^.nodes[spki("d2")] = 2 + int(rand.float32() * 3)
+            (&vlf_haze[curr_idx])^.nodes[spki("x")] = 3
+            (&vlf_haze[curr_idx])^.nodes[spki("o1")] = 20 + int(rand.float32() * 41)
+            (&vlf_haze[curr_idx])^.nodes[spki("o2")] = 20 + int(rand.float32() * 41)
+            (&vlf_haze[curr_idx])^.nodes[spki("o3")] = 20 + int(rand.float32() * 41)
         }
     }
 }
@@ -90,23 +91,25 @@ vlf_run_haze :: proc() {
 
                 o_id := vlf_build_id(.Ort)
                 id_seed += 1
-                vlf_elements[o_id] = VLF_Element{
-                   id = o_id,
-                   core = &vlf_cores[o_sub_type_key],
-                   pos = {o_x, o_y },
-                   vel = { o_vel, o_dir },
-                   gen = step,
-                   age = 1,
-                   status = .Active,
-                   life = vlf_cores[o_sub_type_key].maxlife,
-                   maxlife = vlf_cores[o_sub_type_key].maxlife,
-                   decay = vlf_cores[o_sub_type_key].decay,
-                   complexity = 0,
-                   num_vars = make(map[string]f32),
-                   str_vars = make(map[string]string),
-                   data = form.result_sub_type,
-                   parent = ""
-                }
+                append(&vlf_elems, VLF_Element{
+                    id = o_id,
+                    core = &vlf_cores[o_sub_type_key],
+                    pos = {o_x, o_y },
+                    vel = { o_vel, o_dir },
+                    gen = step,
+                    age = 1,
+                    status = .Active,
+                    life = vlf_cores[o_sub_type_key].maxlife,
+                    maxlife = vlf_cores[o_sub_type_key].maxlife,
+                    decay = vlf_cores[o_sub_type_key].decay,
+                    complexity = 0,
+                    num_vars = make(map[string]f32),
+                    str_vars = make(map[string]string),
+                    data = form.result_sub_type,
+                    parent = "",
+                    next = nil,
+                    prev = nil
+                })
             } 
         }
     }
@@ -148,7 +151,7 @@ vlf_haze_query :: proc(elem:^VLF_Element, check_types:[]string) -> [dynamic]^VLF
             h_idx:int = (r * int(haze_rows) + c)
             type_count:int = 0
             for cs in check_types {
-                if vlf_haze[h_idx].nodes[cs] > 0 {
+                if vlf_haze[h_idx].nodes[spki(cs)] > 0 {
                     type_count += 1
                 }
             }
@@ -167,9 +170,9 @@ vlf_haze_query_2 :: proc(pos:rl.Vector2) -> map[string]int {
     row:f32 = mth.floor(pos.y / haze_h)
 
     h_idx:int = int((row * haze_rows) + col)
-    for s : = 0; s < len(vlf_spek_types); s += 1 {
+    for s : = 1; s < len(vlf_spek_types); s += 1 {
         ss:string = vlf_spek_types[s]
-        ret_val[ss] = vlf_haze[h_idx].nodes[ss]
+        ret_val[ss] = vlf_haze[h_idx].nodes[spki(ss)]
     }
 
     return ret_val
@@ -179,7 +182,7 @@ vlf_haze_transact :: proc(pos:rl.Vector2, s_type:string, count:int) {
     h_c:f32 = mth.floor(pos.x / haze_w)
     h_r:f32 = mth.floor(pos.y / haze_h)
     h_idx:f32 = (h_r * haze_cols) + h_c
-    if s_type in vlf_haze[int(h_idx)].nodes {
-        vlf_haze[int(h_idx)].nodes[s_type] += count
+    if spki(s_type) < len(vlf_spek_types) {
+        vlf_haze[int(h_idx)].nodes[spki(s_type)] += count
     }
 }

@@ -1,6 +1,7 @@
 package vlf
 
 import "core:fmt"
+import mem "core:mem"
 import "core:strings"
 import mth "core:math"
 import rl "vendor:raylib"
@@ -11,7 +12,18 @@ vlf_cores := make(map[string]VLF_Element_Core)
 // SPEKS
 // (OLD: A1, A2, B1, B2, C1, C2, D1, D2, U1, U2, X, G1, G2, G3, V)
 
-vlf_spek_types := []string{"a1","a2","b1","b2","g1","g2","d1","d2","u1","u2","x","o1","o2","o3","v"}
+vlf_spek_types := []string{"na","a1","a2","b1","b2","g1","g2","d1","d2","u1","u2","x","o1","o2","o3","v"}
+
+// quick function to get index of an array
+// based on spek type string
+spki :: proc(t:string) -> int {
+    for i := 0; i < len(vlf_spek_types); i += 1 {
+        if vlf_spek_types[i] == t {
+            return i;
+        }
+    }
+    return 0;
+}
 
 // ORTS
 // (OLD: A, B, C, D, P, E, U, I)
@@ -88,11 +100,13 @@ VLF_Element :: struct {
     num_vars:map[string]f32,
     str_vars:map[string]string,
     data:string,
-    parent:string
+    parent:string,
+    next:^VLF_Element,
+    prev:^VLF_Element
 }
 
-vlf_active_d:string = "ABGD"
-vlf_active_r:string = "ABGU"
+vlf_active_d :: "ABGD"
+vlf_active_r :: "ABGU"
 
 vlf_init_cores :: proc() {
 
@@ -233,8 +247,8 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
                 g_count := vlf_haze_query(ort, {"g1","g2"})
                 if len(g_count) > 0 && rand.float32() > 0.999 {
                     ort^.status = .Inactive
-                    g_count[0]^.nodes["g1"] -= 1
-                    g_count[0]^.nodes["g2"] -= 1
+                    g_count[0]^.nodes[spki("g1")] -= 1
+                    g_count[0]^.nodes[spki("g2")] -= 1
 
                     sn_key := "snip.ex"
                     sn_pos := ort.pos
@@ -242,7 +256,7 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
 
                     sn_id:string = vlf_build_id(.Snip)
                     id_seed += 1
-                    vlf_elements[sn_id] = VLF_Element{
+                    append(&vlf_elems, VLF_Element{
                         id = sn_id,
                         core = &vlf_cores[sn_key],
                         pos = sn_pos,
@@ -257,23 +271,25 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
                         num_vars = make(map[string]f32),
                         str_vars = make(map[string]string),
                         data = "E--",
-                        parent = ""
-                    }
+                        parent = "",
+                        next = nil,
+                        prev = nil
+                    })
                 }
             }
             else {
                 close := vlf_hash_find(ort, { .Ort })
                 if len(close) >= 2 {
-                    if ((strings.contains(vlf_active_d,ort^.data) && strings.contains(vlf_active_d,vlf_elements[close[0]].data) && strings.contains(vlf_active_d,vlf_elements[close[1]].data)) || 
-                            (strings.contains(vlf_active_r, ort^.data) && strings.contains(vlf_active_r,vlf_elements[close[0]].data) && strings.contains(vlf_active_r, vlf_elements[close[1]].data))) {
+                    if ((strings.contains(vlf_active_d,ort^.data) && strings.contains(vlf_active_d,close[0]^.data) && strings.contains(vlf_active_d,close[1]^.data)) || 
+                            (strings.contains(vlf_active_r, ort^.data) && strings.contains(vlf_active_r,close[0]^.data) && strings.contains(vlf_active_r, close[1]^.data))) {
                         sn_pos := ort^.pos
                         sn_vel := ort^.vel
                         sn_data := ort^.data
                         for i := 0; i < 2; i += 1 {
-                            (&vlf_elements[close[i]])^.status = .Inactive
-                            sn_pos += vlf_elements[close[i]].pos
-                            sn_vel += vlf_elements[close[i]].vel
-                            sn_data = strings.concatenate({sn_data, vlf_elements[close[i]].data })
+                            close[i]^.status = .Inactive
+                            sn_pos += close[i]^.pos
+                            sn_vel += close[i]^.vel
+                            sn_data = strings.concatenate({sn_data, close[i]^.data })
                         }
                         ort^.status = .Inactive
 
@@ -290,7 +306,7 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
 
                         sn_id:string = vlf_build_id(.Snip)
                         id_seed += 1
-                        vlf_elements[sn_id] = VLF_Element{
+                        append(&vlf_elems, VLF_Element{
                             id = sn_id,
                             core = &vlf_cores[sn_key],
                             pos = sn_pos,
@@ -305,18 +321,20 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
                             num_vars = sn_num_vars,
                             str_vars = make(map[string]string),
                             data = sn_data,
-                            parent = ""
-                        }
+                            parent = "",
+                            next = nil,
+                            prev = nil
+                        })
                     }
                 }
-                else if len(close) == 1 && ((strings.contains(vlf_active_d, ort^.data) && strings.contains(vlf_active_d,vlf_elements[close[0]].data)) || 
-                            (strings.contains(vlf_active_r,ort^.data) && strings.contains(vlf_active_r,vlf_elements[close[0]].data))) { 
-                    (&vlf_elements[close[0]])^.status = .Inactive
+                else if len(close) == 1 && ((strings.contains(vlf_active_d, ort^.data) && strings.contains(vlf_active_d,close[0]^.data)) || 
+                            (strings.contains(vlf_active_r,ort^.data) && strings.contains(vlf_active_r,close[0]^.data))) { 
+                    close[0]^.status = .Inactive
                     ort^.status = .Inactive
 
-                    sn_pos := ort^.pos + vlf_elements[close[0]].pos
-                    sn_vel := ort^.vel + vlf_elements[close[0]].vel
-                    sn_data := strings.concatenate({ort^.data, vlf_elements[close[0]].data })
+                    sn_pos := ort^.pos + close[0]^.pos
+                    sn_vel := ort^.vel + close[0]^.vel
+                    sn_data := strings.concatenate({ort^.data, close[0]^.data })
 
                     ort^.status = .Inactive
 
@@ -325,7 +343,7 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
 
                     sn_id:string = vlf_build_id(.Snip)
                     id_seed += 1
-                    vlf_elements[sn_id] = VLF_Element{
+                    append(&vlf_elems, VLF_Element{
                         id = sn_id,
                         core = &vlf_cores[sn_key],
                         pos = sn_pos,
@@ -340,8 +358,10 @@ vlf_run_ort :: proc(ort:^VLF_Element) {
                         num_vars = make(map[string]f32),
                         str_vars = make(map[string]string),
                         data = sn_data,
-                        parent = ""
-                    }
+                        parent = "",
+                        next = nil,
+                        prev = nil
+                    })
                 }
                 delete(close)
             }
@@ -359,14 +379,14 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
             switch snip.core^.sub_type {
                 case "pre":
                     close := vlf_hash_find(snip, {.Ort })
-                    if len(close) > 0 && ((!strings.contains(snip^.data, "U") && strings.contains(vlf_active_d,vlf_elements[close[0]].data)) || 
-                            (strings.contains(snip^.data, "U") && strings.contains(vlf_active_r,vlf_elements[close[0]].data))) {
-                        (&vlf_elements[close[0]])^.status = .Inactive
+                    if len(close) > 0 && ((!strings.contains(snip^.data, "U") && strings.contains(vlf_active_d,close[0]^.data)) || 
+                            (strings.contains(snip^.data, "U") && strings.contains(vlf_active_r,close[0]^.data))) {
+                        close[0]^.status = .Inactive
                         snip^.status = .Inactive
 
-                        sn_pos := snip^.pos + vlf_elements[close[0]].pos
-                        sn_vel := snip^.vel + vlf_elements[close[0]].vel
-                        sn_data := strings.concatenate({snip^.data, vlf_elements[close[0]].data })
+                        sn_pos := snip^.pos + close[0]^.pos
+                        sn_vel := snip^.vel + close[0]^.vel
+                        sn_data := strings.concatenate({snip^.data, close[0]^.data })
 
                         sn_key := "snip.go"
                         sn_pos /= 2
@@ -380,7 +400,7 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
                         } 
 
                         sn_id:string = vlf_build_id(.Snip)
-                        vlf_elements[sn_id] = VLF_Element{
+                        append(&vlf_elems, VLF_Element{
                             id = sn_id,
                             core = &vlf_cores[sn_key],
                             pos = sn_pos,
@@ -395,8 +415,10 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
                             num_vars = sn_num_vars,
                             str_vars = make(map[string]string),
                             data = sn_data,
-                            parent = ""
-                        }
+                            parent = "",
+                            next = nil,
+                            prev = nil
+                        })
                     }
                     delete(close)
                 case "go":
@@ -407,10 +429,10 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
                         combined:bool = false
 
                         for sn in close {
-                            if vlf_elements[sn].core.sub_type == "go" && ((!strings.contains(st_code,"U") && !strings.contains(vlf_elements[sn].data,"U")) ||
-                                (strings.contains(st_code,"U") && strings.contains(vlf_elements[sn].data,"U"))) {
-                                    (&vlf_elements[sn])^.status = .Inactive
-                                    st_code = strings.concatenate({st_code, vlf_elements[sn].data})
+                            if sn^.core.sub_type == "go" && ((!strings.contains(st_code,"U") && !strings.contains(sn^.data,"U")) ||
+                                (strings.contains(st_code,"U") && strings.contains(sn^.data,"U"))) {
+                                    sn^.status = .Inactive
+                                    st_code = strings.concatenate({st_code, sn^.data})
                                     combined = true
                                 }
                         }
@@ -427,7 +449,7 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
 
                             st_id:string = vlf_build_id(.Strand)
                             id_seed += 1
-                            vlf_elements[st_id] = VLF_Element{
+                            append(&vlf_elems, VLF_Element{
                                 id = st_id,
                                 core = &vlf_cores[st_key],
                                 pos = st_pos,
@@ -442,8 +464,10 @@ vlf_run_snip :: proc(snip:^VLF_Element) {
                                 num_vars = make(map[string]f32),
                                 str_vars = make(map[string]string),
                                 data = st_code,
-                                parent = ""
-                            }
+                                parent = "",
+                                next = nil,
+                                prev = nil
+                            })
                         }
                     }
                     delete(close)
@@ -468,11 +492,11 @@ vlf_run_strand :: proc(strand:^VLF_Element) {
             combined:bool = false
 
             for elem in close {
-                if (!strings.contains(strand^.data,"U") && !strings.contains(vlf_elements[elem].data,"U")) ||
-                    (strings.contains(strand^.data,"U") && strings.contains(vlf_elements[elem].data,"U")) {
-                        if (vlf_elements[elem].core.e_type == .Snip && vlf_elements[elem].core.sub_type == "go") || vlf_elements[elem].core.e_type == .Strand {
-                            (&vlf_elements[elem])^.status = .Inactive
-                            strand^.data = strings.concatenate({strand^.data, vlf_elements[elem].data})
+                if (!strings.contains(strand^.data,"U") && !strings.contains(elem^.data,"U")) ||
+                    (strings.contains(strand^.data,"U") && strings.contains(elem^.data,"U")) {
+                        if (elem^.core.e_type == .Snip && elem^.core.sub_type == "go") || elem^.core.e_type == .Strand {
+                            elem^.status = .Inactive
+                            strand^.data = strings.concatenate({strand^.data, elem^.data})
                             combined = true
                         }
                     }

@@ -1,6 +1,7 @@
 package vlf
 
 import "core:fmt"
+import mem "core:mem"
 import "core:strings"
 import mth "core:math"
 import rl "vendor:raylib"
@@ -15,51 +16,63 @@ VLF_Code_Action :: enum {
     Build
 }
 
+VLF_Code_Params :: struct {
+    act_move:bool,
+    act_percieve:bool,
+    act_seek:bool,
+    act_breathe:bool,
+    act_build:bool,
+    move_speed:f32,
+    range:f32,
+    breath_in:i32,
+    breath_out:i32
+}
+
 vlf_run_code :: proc(elem:^VLF_Element) {
     code:string = elem^.data
 
-    c_params := make(map[string]f32)
-    c_params["act_move"] = 0
-    c_params["act_percive"] = 0
-    c_params["act_seek"] = 0
-    c_params["act_breathe"] = 0
-    c_params["act_build"] = 0
+    c_params := VLF_Code_Params{
+        act_move = false,
+        act_percieve = false,
+        act_seek = false,
+        act_breathe = false,
+        act_build = false,
+        move_speed = 0,
+        range = elem^.core.range,
+        breath_in = 0,
+        breath_out = 1
+    }
 
-    c_params["move_speed"] = 0
-    c_params["range"] = elem^.core.range
-    c_params["breath_in"] = 0
-    c_params["breath_out"] = 1
-
-    c_breath := []string{ "g1", "g2" }
+    c_breath :: []string{ "g1", "g2" }
 
     if len(code) >= 3 {
         for c:int = 2; c < len(code); c += 1 {
             curr_code:string = code[c-2:c+1]
             switch curr_code {
                 case "AAA":
-                    c_params["move_speed"] += 1
+                    c_params.move_speed += 1
                 case "AAB":
-                    c_params["move_speed"] += 1
+                    c_params.move_speed += 1
                 case "AAC":
-                    c_params["move_speed"] += 2
+                    c_params.move_speed += 2
                 case "AAD":
-                    c_params["move_speed"] += 2
+                    c_params.move_speed += 2
                 case "ABA":
-                    c_params["range"] *= 3
+                    c_params.range *= 3
                 case "ABB":
                     if elem^.complexity > 0 {
-                        c_params["act_seek"] = 1
+                        c_params.act_seek = true
                     }
                 case "ABD":
                     if elem^.complexity > 0 {
-                        c_params["act_move"] = 1
+                        c_params.act_move = true
                     }
                 case "ACA":
-                    c_params["breath_in"] = 1
-                    c_params["breath_out"] = 0
+                    c_params.breath_in = 1
+                    c_params.breath_out = 0
                 case "ACB":
                     if elem^.complexity > 0 {
-                        c_params["act_breathe"] = 1
+                        c_params.act_breathe = true
                     }
 
 
@@ -75,46 +88,46 @@ vlf_run_code :: proc(elem:^VLF_Element) {
 
                 case "UUU":
                 case "UBA":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UBB":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UBG":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UBU":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UAB":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UGB":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
                 case "UUB":
-                    c_params["act_build"] = 1
+                    c_params.act_build = true
 
                 case "III":
             }
         }
 
-        if c_params["act_move"] == 1 {
-            elem^.vel.x = c_params["move_speed"]
+        if c_params.act_move {
+            elem^.vel.x = c_params.move_speed
         }
 
-        if c_params["act_seek"] == 1 {
+        if c_params.act_seek {
             
         }
 
-        if c_params["act_percieve"] == 1 {
+        if c_params.act_percieve {
             
         }
 
-        if c_params["act_breath"] == 1 {
+        if c_params.act_breathe {
             
         }
 
-        if c_params["act_build"] == 1 {
+        if c_params.act_build {
             if elem^.num_vars["b_step"] < 3 {
                 close := vlf_hash_find(elem, {.Ort})
                 for ort in close {
-                    if vlf_elements[ort].core.sub_type == "P" {
-                        (&vlf_elements[ort])^.status = .Inactive
+                    if ort^.core.sub_type == "P" {
+                        ort^.status = .Inactive
                         elem^.num_vars["b_step"] += 1
                     }
                 }
@@ -133,7 +146,7 @@ vlf_run_code :: proc(elem:^VLF_Element) {
                 sn_data:string = ":PPP"
 
                 sn_id:string = vlf_build_id(.Snip)
-                vlf_elements[sn_id] = VLF_Element{
+                append(&vlf_elems, VLF_Element{
                     id = sn_id,
                     core = &vlf_cores[sn_key],
                     pos = sn_pos,
@@ -148,9 +161,10 @@ vlf_run_code :: proc(elem:^VLF_Element) {
                     num_vars = make(map[string]f32),
                     str_vars = make(map[string]string),
                     data = sn_data,
-                    parent = ""
-                }
-                    
+                    parent = "",
+                    next = nil,
+                    prev = nil
+                })  
             }
         }
 

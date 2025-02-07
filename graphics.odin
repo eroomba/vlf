@@ -11,31 +11,54 @@ VLF_Graphics_Params :: struct {
 	color:rl.Color
 }
 
-vlf_img_cache := make(map[string]rl.Image)
-vlf_tex_cache := make(map[string]rl.Texture2D)
+src_images:[6]rl.Image
+textures:[6]rl.Texture2D
 vlf_font:rl.Font
+
+t_bg_idx := -1
+t_env_idx := -1
+t_info_idx := -1
+t_ort_idx := -1
+t_snip_idx := -1
+t_strand_idx := -1
+t_proto_idx := -1
+t_struck_idx := -1
+t_xtra_idx := -1
+
+i_ort_idx := -1
+i_snip_idx := -1
+i_strand_idx := -1
+i_proto_idx := -1
+i_struck_idx := -1
+i_xtra_idx := -1
 
 vlf_draw :: proc() {
 
-    rl.DrawTexture(vlf_tex_cache["bg"], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
+    rl.DrawTexture(textures[t_bg_idx], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
 
-	for e_id in vlf_elements {
-		if vlf_elements[e_id].status == .Active {
-			vlf_draw_element(&vlf_elements[e_id])
+	for &elem in vlf_elems {
+		if elem.status == .Active {
+			vlf_draw_element(&elem)
 		}
 	}
 
 	if .EnvironmentDisplay in vlf_set_flags {
 		vlf_draw_environment()
 	}
-	
-	if len(vlf_info_item) > 0 && vlf_info_item in vlf_elements && vlf_info_item_timer > 0 {
+
+	if vlf_info_item != nil && vlf_info_item^.status == .Active && vlf_info_item_timer > 0 {
 		vlf_draw_info()
 	}
 }
 
 vlf_draw_info :: proc() {
-	if len(vlf_info_item) > 0 && vlf_info_item in vlf_elements && vlf_elements[vlf_info_item].status == .Active && vlf_info_item_timer > 0 {
+	if vlf_info_item != nil && vlf_info_item^.status == .Active && vlf_info_item_timer > 0 {
+		info_id := vlf_info_item^.id
+		info_type := vlf_info_item^.core.e_type
+		info_sub_type := vlf_info_item^.core.sub_type
+		info_data := vlf_info_item^.data
+		info_params := vlf_item_draw_params(vlf_info_item)
+
 		buf:[64]u8
 
 		font_size:i32 = 16
@@ -57,73 +80,69 @@ vlf_draw_info :: proc() {
 		rl.ImageDrawCircle(&info, round_r, info_h - round_r, round_r, info_bg)
 		rl.ImageDrawRectangle(&info, round_r, 0, info_w - (2 * round_r), info_h,  info_bg)
 		rl.ImageDrawRectangle(&info, 0, round_r, info_w, info_h - (2 * round_r), info_bg)
-
-		switch vlf_elements[vlf_info_item].core.e_type {
+		switch info_type {
 			case .None:
 			case .Spek:
 			case .Ort:
-				o_params := vlf_item_draw_params(&vlf_elements[vlf_info_item])
-				o_params.color[3] = 255
+				info_params.color[3] = 255
 
 				ort_thw:f32 = 100
 
 				t_x:f32 = (f32(info_w) / 2) - (ort_thw / 2)
 				t_y:f32 = f32(padding)
-
-				rl.ImageDraw(&info, vlf_img_cache["orts"], o_params.rect, {t_x, t_y, ort_thw, ort_thw}, o_params.color)
+				rl.ImageDraw(&info, src_images[i_ort_idx], info_params.rect, {t_x, t_y, ort_thw, ort_thw}, info_params.color)
 			case .Snip:
-				sn_params := vlf_item_draw_params(&vlf_elements[vlf_info_item])
-				sn_params.color[3] = 255
+				info_params.color[3] = 255
 
 				snip_th:f32 = 100
-				snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
+				snip_tw:f32 = (info_params.rect.width / info_params.rect.height) * snip_th
 
 				t_x:f32 = (f32(info_w) / 2) - (snip_tw / 2)
 				t_y:f32 = f32(padding)
 
-				rl.ImageDraw(&info, vlf_img_cache["snips"], sn_params.rect, {t_x, t_y, snip_tw, snip_th }, sn_params.color)
+				rl.ImageDraw(&info, src_images[i_snip_idx], info_params.rect, {t_x, t_y, snip_tw, snip_th }, info_params.color)
 			case .Strand:
-				st_params := vlf_item_draw_params(&vlf_elements[vlf_info_item])
-				st_params.color[3] = 255
+				info_params.color[3] = 255
 
 				strand_th:f32 = 100
-				strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
+				strand_tw:f32 = (info_params.rect.width / info_params.rect.height) * strand_th
 
 				t_x:f32 = (f32(info_w) / 2) - (strand_tw / 2)
 				t_y:f32 = f32(padding)
 
-				rl.ImageDraw(&info, vlf_img_cache["strands"], st_params.rect, {t_x, t_y, strand_tw, strand_th }, st_params.color)
+				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
 			case .Proto:
 			case .Struck:
 			case .Xtra:
 		}
 
+
 		i_buff:string = ""
 		y_off:f32 = 110
 		
-		disp_id:string = vlf_elements[vlf_info_item].id
+		disp_id:string = info_id
 		i_buff = strings.concatenate({"Item ID: ", disp_id})
 		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
-		i_buff = strings.concatenate({"Type: ", vlf_type_name(vlf_elements[vlf_info_item].core.e_type)})
+		i_buff = strings.concatenate({"Type: ", vlf_type_name(info_type)})
 		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
-		i_buff = strings.concatenate({"Class: ", vlf_class_name(vlf_elements[vlf_info_item].core.e_type,vlf_elements[vlf_info_item].core.sub_type)})
+		i_buff = strings.concatenate({"Class: ", vlf_class_name(info_type,info_sub_type)})
 		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
-		switch vlf_elements[vlf_info_item].core.e_type {
+		switch info_type {
 			case .None:
 			case .Spek:
 			case .Ort:
 			case .Snip:
-				if !(vlf_elements[vlf_info_item].core.sub_type == "ex" || vlf_elements[vlf_info_item].core.sub_type == "block") {
-					i_buff = strings.concatenate({"Code: ", vlf_elements[vlf_info_item].data})
+				if !(info_sub_type == "ex" || info_sub_type == "block") {
+					i_buff = strings.concatenate({"Code: ", info_data})
 					rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 					y_off += f32(font_size) + 3
 				}
@@ -133,7 +152,7 @@ vlf_draw_info :: proc() {
 				y_off += f32(font_size) + 3
 
 				code_parts := make([dynamic]string)
-				code := vlf_elements[vlf_info_item].data
+				code := info_data
 				c_idx:int = 0
 				curr_part:string = ""
 				for c_idx < len(code) {
@@ -160,12 +179,11 @@ vlf_draw_info :: proc() {
 			case .Xtra:
 		}
 
-
 		filter := rl.TextureFilter.BILINEAR
 
-		vlf_tex_cache["info"] = rl.LoadTextureFromImage(info)
-		rl.GenTextureMipmaps(&vlf_tex_cache["info"])
-		rl.SetTextureFilter(vlf_tex_cache["info"], filter)
+		textures[t_info_idx] = rl.LoadTextureFromImage(info)
+		rl.GenTextureMipmaps(&textures[t_info_idx])
+		rl.SetTextureFilter(textures[t_info_idx], filter)
 
 		info_a:f32 = 200
 		if vlf_info_item_timer < 10 && vlf_info_item_timer >= 0 {
@@ -175,7 +193,7 @@ vlf_draw_info :: proc() {
 		info_x:f32 = active_width - info_offset - f32(info_w)
 		info_y:f32 = active_height - info_offset - f32(info_h)
 
-		rl.DrawTextureRec(vlf_tex_cache["info"], {0, 0, f32(info_w), f32(info_h)}, { info_x, info_y }, { 255, 255, 255, u8(info_a)})
+		rl.DrawTextureRec(textures[t_info_idx], {0, 0, f32(info_w), f32(info_h)}, { info_x, info_y }, { 255, 255, 255, u8(info_a)})
 	}
 }
 
@@ -249,11 +267,11 @@ vlf_draw_environment :: proc() {
 
 	filter := rl.TextureFilter.BILINEAR
 
-	vlf_tex_cache["env"] = rl.LoadTextureFromImage(hud)
-	rl.GenTextureMipmaps(&vlf_tex_cache["env"])
-	rl.SetTextureFilter(vlf_tex_cache["env"], filter)
+	textures[t_env_idx] = rl.LoadTextureFromImage(hud)
+	rl.GenTextureMipmaps(&textures[t_env_idx])
+	rl.SetTextureFilter(textures[t_env_idx], filter)
 
-	rl.DrawTextureRec(vlf_tex_cache["env"], {0, 0, f32(hud_w), f32(hud_h)}, hud_pos, rl.WHITE)
+	rl.DrawTextureRec(textures[t_env_idx], {0, 0, f32(hud_w), f32(hud_h)}, hud_pos, rl.WHITE)
 }
 
 vlf_draw_element :: proc(elem:^VLF_Element) {
@@ -265,24 +283,24 @@ vlf_draw_element :: proc(elem:^VLF_Element) {
 			if elem^.decay <= 10 {
 				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(elem^.decay) / 10))
 			}
-			ort_thw:f32 = f32(i32(screen_height * 0.013))
-			rl.DrawTexturePro(vlf_tex_cache["orts"], o_params.rect, {elem.pos.x, elem.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, elem.vel.y, o_params.color)
+			ort_thw:f32 = mth.floor(screen_height * 0.013)
+			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {elem.pos.x, elem.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, elem.vel.y, o_params.color)
 		case .Snip:
 			sn_params := vlf_item_draw_params(elem)
 			if elem^.decay <= 10 {
 				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(elem^.decay) / 10))
 			}
-			snip_th:f32 = f32(i32(screen_height * 0.015))
+			snip_th:f32 = mth.floor(screen_height * 0.015)
 			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
-			rl.DrawTexturePro(vlf_tex_cache["snips"], sn_params.rect, {elem.pos.x, elem.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, elem.vel.y, sn_params.color)
+			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {elem.pos.x, elem.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, elem.vel.y, sn_params.color)
 		case .Strand:
 			st_params := vlf_item_draw_params(elem)
 			if elem^.decay <= 10 {
 				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(elem^.decay) / 10))
 			}
-			strand_th:f32 = f32(i32(screen_height * 0.017))
+			strand_th:f32 = mth.floor(screen_height * 0.017)
 			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
-			rl.DrawTexturePro(vlf_tex_cache["strands"], st_params.rect, {elem.pos.x, elem.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, elem.vel.y, st_params.color)
+			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {elem.pos.x, elem.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, elem.vel.y, st_params.color)
 		case .Proto:
 		case .Struck:
 		case .Xtra:
@@ -294,6 +312,9 @@ vlf_init_graphics :: proc() {
 	vlf_font = rl.LoadFont("./nina.ttf")
 	filter := rl.TextureFilter.BILINEAR
 
+	t_idx := 0
+	i_idx := 0
+
     // main background
     bg_c1 := rl.GetColor(0xCCFFFFFF)
 	bg_c2 := rl.GetColor(0x33FFFFFF)
@@ -303,19 +324,25 @@ vlf_init_graphics :: proc() {
 	rl.GenTextureMipmaps(&bg)
 	rl.SetTextureFilter(bg, filter)
 	rl.UnloadImage(bg_img)
-	vlf_tex_cache["bg"] = bg
+	textures[t_idx] = bg
+	t_bg_idx = t_idx
+	t_idx += 1
 
 	x_img := rl.GenImageColor(200, 200, { 0, 0, 0, 255 })
 
 	env := rl.LoadTextureFromImage(x_img)
 	rl.GenTextureMipmaps(&env)
 	rl.SetTextureFilter(env, filter)
-	vlf_tex_cache["env"] = env
+	textures[t_idx] = env
+	t_env_idx = t_idx
+	t_idx += 1
 
 	info := rl.LoadTextureFromImage(x_img)
 	rl.GenTextureMipmaps(&info)
 	rl.SetTextureFilter(info, filter)
-	vlf_tex_cache["info"] = info
+	textures[t_idx] = info
+	t_info_idx = t_idx
+	t_idx += 1
 
 	rl.UnloadImage(x_img)
 
@@ -323,33 +350,46 @@ vlf_init_graphics :: proc() {
 	orts := rl.LoadTextureFromImage(orts_img)
 	rl.GenTextureMipmaps(&orts)
 	rl.SetTextureFilter(orts, filter)
-	vlf_img_cache["orts"] = orts_img
-	vlf_tex_cache["orts"] = orts
+	textures[t_idx] = orts
+	src_images[i_idx] = orts_img
+	t_ort_idx = t_idx
+	t_idx += 1
+	i_ort_idx = i_idx
+	i_idx += 1
+	
 
 	snips_img := rl.LoadImage("./images/snips.png")
 	snips := rl.LoadTextureFromImage(snips_img)
 	rl.GenTextureMipmaps(&snips)
 	rl.SetTextureFilter(snips, filter)
-	vlf_img_cache["snips"] = snips_img
-	vlf_tex_cache["snips"] = snips
+	textures[t_idx] = snips
+	src_images[i_idx] = snips_img
+	t_snip_idx = t_idx
+	t_idx += 1
+	i_snip_idx = i_idx
+	i_idx += 1
 
 	strands_img := rl.LoadImage("./images/strands.png")
 	strands := rl.LoadTextureFromImage(strands_img)
 	rl.GenTextureMipmaps(&strands)
 	rl.SetTextureFilter(strands, filter)
-	vlf_img_cache["strands"] = strands_img
-	vlf_tex_cache["strands"] = strands
+	textures[t_idx] = strands
+	src_images[i_idx] = strands_img
+	t_strand_idx = t_idx
+	t_idx += 1
+	i_strand_idx = i_idx
+	i_idx += 1
 }
 
 vlf_graphics_end :: proc() {
-	for key in vlf_img_cache {
-		rl.UnloadImage(vlf_img_cache[key])
+	for tex in textures {
+		rl.UnloadTexture(tex)
 	}
-	for key in vlf_tex_cache {
-		rl.UnloadTexture(vlf_tex_cache[key])
+	for img in src_images {
+		rl.UnloadImage(img)
 	}
-	delete(vlf_img_cache)
-	delete(vlf_tex_cache)
+	//delete(vlf_img_cache)
+	//delete(vlf_tex_cache)
 	rl.UnloadFont(vlf_font)
 }
 

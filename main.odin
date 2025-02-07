@@ -52,18 +52,20 @@ main :: proc() {
 		vlf_mouse_pos = rl.GetMousePosition()
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-			vlf_click({vlf_mouse_pos.x, vlf_mouse_pos.y}, vlf_set_flags)
+			inject_at(&vlf_events, 0, VLF_Event{
+				e_type = .Click,
+				flags = vlf_set_flags + {},
+				pos = vlf_mouse_pos
+			})
 		
 			if mouse_button_timer[0] > 0 {
 				inject_at(&vlf_events, 0, VLF_Event{
-					e_type = .Puff,
+					e_type = .DoubleClick,
+					flags = vlf_set_flags + {},
 					pos = vlf_mouse_pos
 				})
 			}
 
-		}
-
-		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 			mouse_button_timer[0] = 10
 		}
 
