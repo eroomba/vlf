@@ -6,14 +6,14 @@ import mth "core:math"
 import rl "vendor:raylib"
 import "core:strconv"
 
-VLF_Graphics_Params :: struct {
+Graphics_Params :: struct {
 	rect:rl.Rectangle,
 	color:rl.Color
 }
 
-src_images:[6]rl.Image
-textures:[6]rl.Texture2D
-vlf_font:rl.Font
+src_images:[7]rl.Image
+textures:[7]rl.Texture2D
+font:rl.Font
 
 t_bg_idx := -1
 t_env_idx := -1
@@ -22,42 +22,42 @@ t_ort_idx := -1
 t_snip_idx := -1
 t_strand_idx := -1
 t_proto_idx := -1
-t_struck_idx := -1
+t_comp_idx := -1
 t_xtra_idx := -1
 
 i_ort_idx := -1
 i_snip_idx := -1
 i_strand_idx := -1
 i_proto_idx := -1
-i_struck_idx := -1
+i_comp_idx := -1
 i_xtra_idx := -1
 
 vlf_draw :: proc() {
 
     rl.DrawTexture(textures[t_bg_idx], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
 
-	for &elem in vlf_elems {
-		if elem.status == .Active {
-			vlf_draw_element(&elem)
+	for &ent in entities {
+		if ent.status == .Active {
+			draw_entity(&ent)
 		}
 	}
 
-	if .EnvironmentDisplay in vlf_set_flags {
-		vlf_draw_environment()
+	if .EnvironmentDisplay in set_flags {
+		draw_environment()
 	}
 
-	if vlf_info_item != nil && vlf_info_item^.status == .Active && vlf_info_item_timer > 0 {
-		vlf_draw_info()
+	if info_item != nil && info_item^.status == .Active && info_item_timer > 0 {
+		draw_info()
 	}
 }
 
-vlf_draw_info :: proc() {
-	if vlf_info_item != nil && vlf_info_item^.status == .Active && vlf_info_item_timer > 0 {
-		info_id := vlf_info_item^.id
-		info_type := vlf_info_item^.core.e_type
-		info_sub_type := vlf_info_item^.core.sub_type
-		info_data := vlf_info_item^.data
-		info_params := vlf_item_draw_params(vlf_info_item)
+draw_info :: proc() {
+	if info_item != nil && info_item^.status == .Active && info_item_timer > 0 {
+		info_id := info_item^.id
+		info_type := info_item^.core.e_type
+		info_sub_type := info_item^.core.sub_type
+		info_data := info_item^.data
+		info_params := item_draw_params(info_item)
 
 		buf:[64]u8
 
@@ -82,11 +82,11 @@ vlf_draw_info :: proc() {
 		rl.ImageDrawRectangle(&info, 0, round_r, info_w, info_h - (2 * round_r), info_bg)
 		switch info_type {
 			case .None:
-			case .Spek:
+			case .Chem:
 			case .Ort:
 				info_params.color[3] = 255
 
-				ort_thw:f32 = 100
+				ort_thw:f32 = 80
 
 				t_x:f32 = (f32(info_w) / 2) - (ort_thw / 2)
 				t_y:f32 = f32(padding)
@@ -94,7 +94,7 @@ vlf_draw_info :: proc() {
 			case .Snip:
 				info_params.color[3] = 255
 
-				snip_th:f32 = 100
+				snip_th:f32 = 80
 				snip_tw:f32 = (info_params.rect.width / info_params.rect.height) * snip_th
 
 				t_x:f32 = (f32(info_w) / 2) - (snip_tw / 2)
@@ -104,7 +104,7 @@ vlf_draw_info :: proc() {
 			case .Strand:
 				info_params.color[3] = 255
 
-				strand_th:f32 = 100
+				strand_th:f32 = 80
 				strand_tw:f32 = (info_params.rect.width / info_params.rect.height) * strand_th
 
 				t_x:f32 = (f32(info_w) / 2) - (strand_tw / 2)
@@ -112,43 +112,52 @@ vlf_draw_info :: proc() {
 
 				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
 			case .Proto:
-			case .Struck:
+			case .Comp:
+				info_params.color[3] = 255
+
+				comp_th:f32 = 80
+				comp_tw:f32 = (info_params.rect.width / info_params.rect.height) * comp_th
+
+				t_x:f32 = (f32(info_w) / 2) - (comp_tw / 2)
+				t_y:f32 = f32(padding)
+
+				rl.ImageDraw(&info, src_images[i_comp_idx], info_params.rect, {t_x, t_y, comp_tw, comp_th }, info_params.color)
 			case .Xtra:
 		}
 
 
 		i_buff:string = ""
-		y_off:f32 = 110
+		y_off:f32 = 100
 		
 		disp_id:string = info_id
 		i_buff = strings.concatenate({"Item ID: ", disp_id})
-		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
-		i_buff = strings.concatenate({"Type: ", vlf_type_name(info_type)})
-		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+		i_buff = strings.concatenate({"Type: ", type_name(info_type)})
+		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
-		i_buff = strings.concatenate({"Class: ", vlf_class_name(info_type,info_sub_type)})
-		rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+		i_buff = strings.concatenate({"Class: ", class_name(info_type,info_sub_type)})
+		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 
 		y_off += f32(font_size) + 3
 
 		switch info_type {
 			case .None:
-			case .Spek:
+			case .Chem:
 			case .Ort:
 			case .Snip:
 				if !(info_sub_type == "ex" || info_sub_type == "block") {
 					i_buff = strings.concatenate({"Code: ", info_data})
-					rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+					rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 					y_off += f32(font_size) + 3
 				}
 			case .Strand:
 				i_buff = "Code: "
-				rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+				rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 				y_off += f32(font_size) + 3
 
 				code_parts := make([dynamic]string)
@@ -169,13 +178,13 @@ vlf_draw_info :: proc() {
 
 				for c := 0; c < len(code_parts); c += 1 {
 					i_buff = code_parts[c]
-					rl.ImageDrawTextEx(&info, vlf_font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+					rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
 					y_off += f32(font_size)
 				}
 
 				delete(code_parts)
 			case .Proto:
-			case .Struck:
+			case .Comp:
 			case .Xtra:
 		}
 
@@ -186,8 +195,8 @@ vlf_draw_info :: proc() {
 		rl.SetTextureFilter(textures[t_info_idx], filter)
 
 		info_a:f32 = 200
-		if vlf_info_item_timer < 10 && vlf_info_item_timer >= 0 {
-			info_a = 255 * (f32(vlf_info_item_timer) / 10)
+		if info_item_timer < 10 && info_item_timer >= 0 {
+			info_a = 255 * (f32(info_item_timer) / 10)
 		}
 
 		info_x:f32 = active_width - info_offset - f32(info_w)
@@ -197,9 +206,9 @@ vlf_draw_info :: proc() {
 	}
 }
 
-vlf_draw_environment :: proc() {
+draw_environment :: proc() {
 	buf:[64]u8
-	counts := vlf_haze_query_2(vlf_mouse_pos)
+	counts := haze_query_2(mouse_pos)
 
 	font_size:i32 = 15
 
@@ -239,30 +248,30 @@ vlf_draw_environment :: proc() {
 		{ "o1", "o2", "o3" }
 	}
 
-	disp = "SPEK COUNTS"
-	rl.ImageDrawTextEx(&hud, vlf_font, strings.clone_to_cstring(disp), { f32(padding), f32(off_y) }, f32(font_size), 0, text_color)
+	disp = "CHEM COUNTS"
+	rl.ImageDrawTextEx(&hud, font, strings.clone_to_cstring(disp), { f32(padding), f32(off_y) }, f32(font_size), 0, text_color)
 	off_y += font_size + padding_y
 
 	for l1 := 0; l1 < len(lines); l1 += 1 {
 		for l2 := 0; l2 < len(lines[l1]); l2 += 1 {
 			cl:string = lines[l1][l2]
-			disp = strings.concatenate({cl, ": ", strconv.itoa(buf[:], counts[cl])})
-			rl.ImageDrawTextEx(&hud, vlf_font, strings.clone_to_cstring(disp), { f32(padding + (i32(l2) * off_x)), f32(off_y) }, f32(font_size), 0, text_color)
+			disp = strings.concatenate({chem_name(cl), ": ", strconv.itoa(buf[:], counts[cl])})
+			rl.ImageDrawTextEx(&hud, font, strings.clone_to_cstring(disp), { f32(padding + (i32(l2) * off_x)), f32(off_y) }, f32(font_size), 0, text_color)
 		}
 		off_y += font_size + padding_y
 	}
 
 	hud_pos:rl.Vector2 = { 0, 0 }
 
-	hud_pos.x = vlf_mouse_pos.x - f32(hud_w) - hud_offset
-	hud_pos.y = vlf_mouse_pos.y - f32(hud_h) - hud_offset
+	hud_pos.x = mouse_pos.x - f32(hud_w) - hud_offset
+	hud_pos.y = mouse_pos.y - f32(hud_h) - hud_offset
 
 	if hud_pos.x < 0 {
-		hud_pos.x = vlf_mouse_pos.x + hud_offset
+		hud_pos.x = mouse_pos.x + hud_offset
 	}
 
 	if hud_pos.y < 0 {
-		hud_pos.y = vlf_mouse_pos.y + hud_offset
+		hud_pos.y = mouse_pos.y + hud_offset
 	}
 
 	filter := rl.TextureFilter.BILINEAR
@@ -274,42 +283,49 @@ vlf_draw_environment :: proc() {
 	rl.DrawTextureRec(textures[t_env_idx], {0, 0, f32(hud_w), f32(hud_h)}, hud_pos, rl.WHITE)
 }
 
-vlf_draw_element :: proc(elem:^VLF_Element) {
-	switch elem.core.e_type {
+draw_entity :: proc(ent:^Entity) {
+	switch ent.core.e_type {
 		case .None:
-		case .Spek:
+		case .Chem:
 		case .Ort:
-			o_params := vlf_item_draw_params(elem)
-			if elem^.decay <= 10 {
-				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(elem^.decay) / 10))
+			o_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent^.decay) / 10))
 			}
 			ort_thw:f32 = mth.floor(screen_height * 0.013)
-			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {elem.pos.x, elem.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, elem.vel.y, o_params.color)
+			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {ent.pos.x, ent.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, ent.vel.y, o_params.color)
 		case .Snip:
-			sn_params := vlf_item_draw_params(elem)
-			if elem^.decay <= 10 {
-				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(elem^.decay) / 10))
+			sn_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent^.decay) / 10))
 			}
 			snip_th:f32 = mth.floor(screen_height * 0.015)
 			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
-			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {elem.pos.x, elem.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, elem.vel.y, sn_params.color)
+			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {ent.pos.x, ent.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, ent.vel.y, sn_params.color)
 		case .Strand:
-			st_params := vlf_item_draw_params(elem)
-			if elem^.decay <= 10 {
-				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(elem^.decay) / 10))
+			st_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent^.decay) / 10))
 			}
 			strand_th:f32 = mth.floor(screen_height * 0.017)
 			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
-			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {elem.pos.x, elem.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, elem.vel.y, st_params.color)
+			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
 		case .Proto:
-		case .Struck:
+		case .Comp:
+			cmp_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				cmp_params.color[3] = u8(f32(cmp_params.color[3]) * (f32(ent^.decay) / 10))
+			}
+			comp_th:f32 = mth.floor(screen_height * 0.017)
+			comp_tw:f32 = (cmp_params.rect.width / cmp_params.rect.height) * comp_th
+			rl.DrawTexturePro(textures[t_comp_idx], cmp_params.rect, {ent.pos.x, ent.pos.y, comp_tw, comp_th }, {comp_tw / 2, comp_th / 2}, ent.vel.y, cmp_params.color)
 		case .Xtra:
 	}
 }
 
-vlf_init_graphics :: proc() {
+init_graphics :: proc() {
 
-	vlf_font = rl.LoadFont("./nina.ttf")
+	font = rl.LoadFont("./nina.ttf")
 	filter := rl.TextureFilter.BILINEAR
 
 	t_idx := 0
@@ -379,34 +395,46 @@ vlf_init_graphics :: proc() {
 	t_idx += 1
 	i_strand_idx = i_idx
 	i_idx += 1
+
+
+	comps_img := rl.LoadImage("./images/comps.png")
+	comps := rl.LoadTextureFromImage(comps_img)
+	rl.GenTextureMipmaps(&comps)
+	rl.SetTextureFilter(comps, filter)
+	textures[t_idx] = comps
+	src_images[i_idx] = comps_img
+	t_comp_idx = t_idx
+	t_idx += 1
+	i_comp_idx = i_idx
+	i_idx += 1
 }
 
-vlf_graphics_end :: proc() {
+graphics_end :: proc() {
 	for tex in textures {
 		rl.UnloadTexture(tex)
 	}
 	for img in src_images {
 		rl.UnloadImage(img)
 	}
-	//delete(vlf_img_cache)
-	//delete(vlf_tex_cache)
-	rl.UnloadFont(vlf_font)
+	//delete(img_cache)
+	//delete(tex_cache)
+	rl.UnloadFont(font)
 }
 
-vlf_item_draw_params :: proc(elem:^VLF_Element) -> VLF_Graphics_Params {
+item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 	ret_rec:rl.Rectangle = { 0, 0, 0, 0 }
 	ret_color:rl.Color = { 255, 255, 255, 255 }
 
-	switch elem^.core.e_type {
+	switch ent^.core.e_type {
 		case .None:
-		case .Spek:
+		case .Chem:
 		case .Ort:
 			offset_x:f32 = 0
 			offset_y:f32 = 0
 			o_alpha:u8 = 70
 			ret_color = { 102, 102, 102, o_alpha}
 
-			switch elem^.core.sub_type {
+			switch ent^.core.sub_type {
 				case "A":
 					offset_x = 0
 					ret_color = { 255, 0, 0, o_alpha}
@@ -442,13 +470,17 @@ vlf_item_draw_params :: proc(elem:^VLF_Element) -> VLF_Graphics_Params {
 			sn_alpha:u8 = 90
 			ret_color = { 102, 102, 102, sn_alpha}
 
-			switch elem^.core.sub_type {
+			switch ent^.core.sub_type {
 				case "pre":
 					offset_y = 0
-					ret_color = { 255, 51, 204, sn_alpha}
+					if strings.contains(ent.data,"U") {
+						ret_color = { 255, 230, 0, sn_alpha}
+					} else {
+						ret_color = { 255, 51, 204, sn_alpha}
+					}
 				case "go":
 					offset_y = 100
-					if strings.contains(elem.data,"U") {
+					if strings.contains(ent.data,"U") {
 						ret_color = { 255, 204, 0, sn_alpha}
 					} else {
 						ret_color = { 102, 0, 204, sn_alpha}
@@ -461,8 +493,8 @@ vlf_item_draw_params :: proc(elem:^VLF_Element) -> VLF_Graphics_Params {
 					ret_color = { 153, 255, 153, sn_alpha}
 				case "build":
 					offset_y = 400
-					if "b_step" in elem^.num_vars {
-						offset_y += elem^.num_vars["b_step"] * 100
+					if "b_step" in ent^.num_vars {
+						offset_y += ent^.num_vars["b_step"] * 100
 					}
 					ret_color = { 255, 204, 0, sn_alpha}
 			}
@@ -477,12 +509,18 @@ vlf_item_draw_params :: proc(elem:^VLF_Element) -> VLF_Graphics_Params {
 			st_alpha:u8 = 110
 			ret_color = { 102, 102, 102, st_alpha}
 
-			switch elem^.core.sub_type {
+			switch ent^.core.sub_type {
 				case "D":
 					offset_y = 0
-					ret_color = { 255, 51, 204, st_alpha}
+					ret_color = { 255, 60, 204, st_alpha}
+					if len(ent^.data) >= 18 {
+						offset_y = 450
+					}
 				case "R":
 					offset_y = 150
+					if "b_step" in ent^.num_vars && ent^.num_vars["b_step"] > 0  {
+						offset_y = 450 + (ent^.num_vars["b_step"] * 150)
+					}
 					ret_color = { 255, 204, 0, st_alpha}
 			}
 
@@ -491,11 +529,32 @@ vlf_item_draw_params :: proc(elem:^VLF_Element) -> VLF_Graphics_Params {
 			
 			ret_rec = {offset_x, offset_y, strand_ow, strand_oh}
 		case .Proto:
-		case .Struck:
+		case .Comp:
+			offset_x:f32 = 0
+			offset_y:f32 = 0
+			cmp_alpha:u8 = 190
+			ret_color = { 102, 102, 102, cmp_alpha}
+
+			switch ent^.core.sub_type {
+				case "brane":
+					offset_y = 0
+					ret_color = { 220, 220, 220, cmp_alpha}
+				case "nugget":
+					offset_y = 200
+					ret_color = { 100, 240, 100, cmp_alpha}
+				case "husk":
+					offset_y = 400
+					ret_color = { 200, 200, 200, cmp_alpha}
+			}
+
+			comp_ow:f32 = 200
+			comp_oh:f32 = 200
+			
+			ret_rec = {offset_x, offset_y, comp_ow, comp_oh}
 		case .Xtra:
 	}
 
-	return VLF_Graphics_Params{
+	return Graphics_Params{
 		rect = ret_rec, 
 		color = ret_color
 	}

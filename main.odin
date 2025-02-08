@@ -38,31 +38,31 @@ main :: proc() {
 		}
 
 		if rl.IsKeyDown(rl.KeyboardKey.LEFT_CONTROL) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_CONTROL) {
-			vlf_set_flags += { .EnvironmentDisplay }
+			set_flags += { .EnvironmentDisplay }
 		} else {
-			vlf_set_flags -= { .EnvironmentDisplay }
+			set_flags -= { .EnvironmentDisplay }
 		}
 
         if rl.IsKeyDown(rl.KeyboardKey.LEFT_SHIFT) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_SHIFT) {
-			vlf_set_flags += { .ItemDisplay }
+			set_flags += { .ItemDisplay }
 		} else {
-			vlf_set_flags -= { .ItemDisplay }
+			set_flags -= { .ItemDisplay }
 		}
 
-		vlf_mouse_pos = rl.GetMousePosition()
+		mouse_pos = rl.GetMousePosition()
 
 		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-			inject_at(&vlf_events, 0, VLF_Event{
+			inject_at(&events, 0, Event{
 				e_type = .Click,
-				flags = vlf_set_flags + {},
-				pos = vlf_mouse_pos
+				flags = set_flags + {},
+				pos = mouse_pos
 			})
 		
 			if mouse_button_timer[0] > 0 {
-				inject_at(&vlf_events, 0, VLF_Event{
+				inject_at(&events, 0, Event{
 					e_type = .DoubleClick,
-					flags = vlf_set_flags + {},
-					pos = vlf_mouse_pos
+					flags = set_flags + {},
+					pos = mouse_pos
 				})
 			}
 

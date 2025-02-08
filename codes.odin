@@ -7,7 +7,7 @@ import mth "core:math"
 import rl "vendor:raylib"
 import "core:math/rand"
 
-VLF_Code_Action :: enum {
+Code_Action :: enum {
     Move,
     Breathe,
     Seek,
@@ -16,7 +16,7 @@ VLF_Code_Action :: enum {
     Build
 }
 
-VLF_Code_Params :: struct {
+Code_Params :: struct {
     act_move:bool,
     act_percieve:bool,
     act_seek:bool,
@@ -28,17 +28,17 @@ VLF_Code_Params :: struct {
     breath_out:i32
 }
 
-vlf_run_code :: proc(elem:^VLF_Element) {
-    code:string = elem^.data
+run_code :: proc(ent:^Entity) {
+    code:string = ent^.data
 
-    c_params := VLF_Code_Params{
+    c_params := Code_Params{
         act_move = false,
         act_percieve = false,
         act_seek = false,
         act_breathe = false,
         act_build = false,
         move_speed = 0,
-        range = elem^.core.range,
+        range = ent^.core.range,
         breath_in = 0,
         breath_out = 1
     }
@@ -60,18 +60,18 @@ vlf_run_code :: proc(elem:^VLF_Element) {
                 case "ABA":
                     c_params.range *= 3
                 case "ABB":
-                    if elem^.complexity > 0 {
+                    if ent^.complexity > 0 {
                         c_params.act_seek = true
                     }
                 case "ABD":
-                    if elem^.complexity > 0 {
+                    if ent^.complexity > 0 {
                         c_params.act_move = true
                     }
                 case "ACA":
                     c_params.breath_in = 1
                     c_params.breath_out = 0
                 case "ACB":
-                    if elem^.complexity > 0 {
+                    if ent^.complexity > 0 {
                         c_params.act_breathe = true
                     }
 
@@ -107,7 +107,7 @@ vlf_run_code :: proc(elem:^VLF_Element) {
         }
 
         if c_params.act_move {
-            elem^.vel.x = c_params.move_speed
+            ent^.vel.x = c_params.move_speed
         }
 
         if c_params.act_seek {
@@ -123,40 +123,40 @@ vlf_run_code :: proc(elem:^VLF_Element) {
         }
 
         if c_params.act_build {
-            if elem^.num_vars["b_step"] < 3 {
-                close := vlf_hash_find(elem, {.Ort})
+            if ent^.num_vars["b_step"] < 3 {
+                close := hash_find(ent, {.Ort})
                 for ort in close {
                     if ort^.core.sub_type == "P" {
                         ort^.status = .Inactive
-                        elem^.num_vars["b_step"] += 1
+                        ent^.num_vars["b_step"] += 1
                     }
                 }
                 delete(close)
             }
 
-            if elem^.num_vars["b_step"] == 3 {
-                elem^.num_vars["b_step"] = 0
+            if ent^.num_vars["b_step"] == 3 {
+                ent^.num_vars["b_step"] = 0
                 sn_key := "snip.block"
-                sn_pos:rl.Vector2 = { elem^.pos.x, elem^.pos.y }
+                sn_pos:rl.Vector2 = { ent^.pos.x, ent^.pos.y }
                 sn_vel_x:f32 = mth.floor(rand.float32() * 2)
-                sn_vel_y:f32 = elem^.vel.y - 180
+                sn_vel_y:f32 = ent^.vel.y - 180
                 if sn_vel_y < 0 {
                     sn_vel_y +=360
                 }
                 sn_data:string = ":PPP"
 
-                sn_id:string = vlf_build_id(.Snip)
-                append(&vlf_elems, VLF_Element{
+                sn_id:string = build_id(.Snip)
+                append(&entities, Entity{
                     id = sn_id,
-                    core = &vlf_cores[sn_key],
+                    core = &entity_cores[sn_key],
                     pos = sn_pos,
                     vel = { sn_vel_x, sn_vel_y },
                     gen = step,
                     age = 1,
                     status = .Active,
-                    life = vlf_cores[sn_key].maxlife,
-                    maxlife = vlf_cores[sn_key].maxlife,
-                    decay = vlf_cores[sn_key].decay,
+                    life = entity_cores[sn_key].maxlife,
+                    maxlife = entity_cores[sn_key].maxlife,
+                    decay = entity_cores[sn_key].decay,
                     complexity = 0,
                     num_vars = make(map[string]f32),
                     str_vars = make(map[string]string),
@@ -171,8 +171,8 @@ vlf_run_code :: proc(elem:^VLF_Element) {
     }
 }
 
-vlf_check_type :: proc(code:string) -> bit_set[VLF_Code_Action] {
-    ret_val := bit_set[VLF_Code_Action]{}
+check_type :: proc(code:string) -> bit_set[Code_Action] {
+    ret_val := bit_set[Code_Action]{}
 
     if  strings.contains(code,"UBA") ||
         strings.contains(code,"UBB") ||
