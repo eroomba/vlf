@@ -24,6 +24,14 @@ hash_end :: proc() {
     delete(hash)
 }
 
+hash_size_of :: proc() -> int {
+    h_size := 0
+    for h1 in hash {
+        h_size += len(h1) * size_of(Hash_Item)
+    }
+    return h_size
+}
+
 build_hash :: proc() {
     clear(&hash)
     for i := 0; i < int(hash_cols); i += 1 {
@@ -98,7 +106,7 @@ hash_find :: proc(ent:^Entity, e_types:bit_set[Entity_Type] = {}) -> [dynamic]^E
     return found
 }
 
-hash_find_2 :: proc(pos:rl.Vector2, range:f32) -> [dynamic]^Entity {
+hash_find_2 :: proc(pos:rl.Vector2, range:f32, e_types:bit_set[Entity_Type] = {}) -> [dynamic]^Entity {
     found := make([dynamic]^Entity)
 
     col:f32 = mth.floor(pos.x / hash_hw)
@@ -136,7 +144,7 @@ hash_find_2 :: proc(pos:rl.Vector2, range:f32) -> [dynamic]^Entity {
         for j:int = int(row_s); j <= int(row_e); j += 1 {
             for k := 0; k < len(hash[i][j].items); k += 1 {
                 chk := hash[i][j].items[k]
-                if chk.status == .Active {
+                if chk.status == .Active && (card(e_types) == 0 || chk^.core.e_type in e_types) {
                     dist := rl.Vector2Distance(pos, chk^.pos)
                     if dist < range {
                         append(&found, &(chk^))

@@ -162,9 +162,8 @@ run_code :: proc(ent:^Entity) {
                     str_vars = make(map[string]string),
                     data = sn_data,
                     parent = "",
-                    next = nil,
-                    prev = nil
-                })  
+                    owner = 0
+                })
             }
         }
 

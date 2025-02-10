@@ -67,7 +67,7 @@ strand_types := []string{"D","R","V"}
 
 proto_types := []string{"Simple","Complex"}
 
-comp_types := []string{"brane","nugget","husk"}
+struck_types := []string{"brane","knot","husk"}
 
 Entity_Status :: enum {
     None,
@@ -82,8 +82,7 @@ Entity_Type :: enum {
     Snip,
     Strand,
     Proto,
-    Comp,
-    Xtra
+    Struck
 }
 
 Entity_Core :: struct {
@@ -112,12 +111,13 @@ Entity :: struct {
     str_vars:map[string]string,
     data:string,
     parent:string,
-    next:^Entity,
-    prev:^Entity
+    owner:int
 }
 
 active_d :: "ABGD"
 active_r :: "ABGU"
+knot_count:int = 3
+brane_count:int = 3
 
 init_cores :: proc() {
 
@@ -137,7 +137,7 @@ init_cores :: proc() {
     }
 
     for snip_type in snip_types {
-        snip_weight:f32 = 0.2
+        snip_weight:f32 = 0.18
         snip_key := strings.concatenate({"snip.", snip_type})
         snip_decay:int = 10000
         if snip_type == "pre" {
@@ -156,7 +156,7 @@ init_cores :: proc() {
     }
 
     for strand_type in strand_types {
-        strand_weight:f32 = 0.25
+        strand_weight:f32 = 0.2
         strand_key := strings.concatenate({"strand.", strand_type})
 
         entity_cores[strand_key] = Entity_Core{
@@ -166,6 +166,34 @@ init_cores :: proc() {
             data = "",
             range = 16,
             decay = 50000,
+            maxlife = 100
+        }
+    }
+
+    for struck_type in struck_types {
+        struck_key := strings.concatenate({"struck.", struck_type})
+        struck_weight:f32 = 0.3
+        struck_range:f32 = 20
+        struck_decay:int = 30000
+
+        switch struck_type {
+            case "brane":
+                struck_weight = 0.25
+                struck_decay = 20000
+            case "knot":
+                struck_weight = 0.18
+            case "husk":
+                struck_weight = 0.2
+                struck_decay = 90000
+        }
+
+        entity_cores[struck_key] = Entity_Core{
+            e_type = Entity_Type.Struck,
+            sub_type = struck_type,
+            weight = struck_weight,
+            data = "",
+            range = struck_range,
+            decay = struck_decay,
             maxlife = 100
         }
     }
@@ -184,10 +212,8 @@ run_entity :: proc(ent:^Entity) {
                 run_strand(ent)
             case .Proto:
                 run_proto(ent)
-            case .Comp:
-                run_comp(ent)
-            case .Xtra:
-                run_xtra(ent)
+            case .Struck:
+                run_struck(ent)
         }
     }
 
@@ -249,7 +275,6 @@ run_ort :: proc(ort:^Entity) {
                     sn_vel := ort.vel
 
                     sn_id:string = build_id(.Snip)
-                    id_seed += 1
                     append(&entities, Entity{
                         id = sn_id,
                         core = &entity_cores[sn_key],
@@ -266,8 +291,7 @@ run_ort :: proc(ort:^Entity) {
                         str_vars = make(map[string]string),
                         data = "E--",
                         parent = "",
-                        next = nil,
-                        prev = nil
+                        owner = 0
                     })
                 }
             }
@@ -300,7 +324,6 @@ run_ort :: proc(ort:^Entity) {
                         } 
 
                         sn_id:string = build_id(.Snip)
-                        id_seed += 1
                         append(&entities, Entity{
                             id = sn_id,
                             core = &entity_cores[sn_key],
@@ -317,8 +340,7 @@ run_ort :: proc(ort:^Entity) {
                             str_vars = make(map[string]string),
                             data = sn_data,
                             parent = "",
-                            next = nil,
-                            prev = nil
+                            owner = 0
                         })
                     }
                 }
@@ -337,7 +359,6 @@ run_ort :: proc(ort:^Entity) {
                     sn_pos /= 2
 
                     sn_id:string = build_id(.Snip)
-                    id_seed += 1
                     append(&entities, Entity{
                         id = sn_id,
                         core = &entity_cores[sn_key],
@@ -354,8 +375,7 @@ run_ort :: proc(ort:^Entity) {
                         str_vars = make(map[string]string),
                         data = sn_data,
                         parent = "",
-                        next = nil,
-                        prev = nil
+                        owner = 0
                     })
                 }
                 delete(close)
@@ -411,8 +431,7 @@ run_snip :: proc(snip:^Entity) {
                             str_vars = make(map[string]string),
                             data = sn_data,
                             parent = "",
-                            next = nil,
-                            prev = nil
+                            owner = 0
                         })
                     }
                     delete(close)
@@ -452,7 +471,6 @@ run_snip :: proc(snip:^Entity) {
                             st_pos:rl.Vector2 = snip^.pos
 
                             st_id:string = build_id(.Strand)
-                            id_seed += 1
                             append(&entities, Entity{
                                 id = st_id,
                                 core = &entity_cores[st_key],
@@ -469,11 +487,131 @@ run_snip :: proc(snip:^Entity) {
                                 str_vars = make(map[string]string),
                                 data = st_code,
                                 parent = "",
-                                next = nil,
-                                prev = nil
+                                owner = 0
                             })
                         }
                     }
+                    delete(close)
+                case "ex":
+
+                    close := hash_find(snip, { .Snip })
+                    ex_b := make([dynamic]^Entity)
+                    for sn in close {
+                        if sn^.core.sub_type == "ex" && len(ex_b) < knot_count - 1 {
+                            append(&ex_b, sn)
+                        }
+                    }
+
+                    if len(ex_b) == knot_count - 1 {
+                        k_pos := snip^.pos
+                        k_vel := snip^.vel
+                        k_w := snip^.core.weight
+                        for sn in ex_b {
+                            sn^.status = .Inactive
+                            k_pos += sn^.pos
+                            k_vel = momentum_add(k_vel, k_w, sn^.vel, sn^.core.weight)
+                        }
+
+                        snip^.status = .Inactive
+                        k_id := build_id(.Struck)
+                        k_pos /= 3
+                        k_key:string = "struck.knot"
+
+                        stk_id := build_id(.Struck)
+                        append(&entities, Entity{
+                            id = k_id,
+                            core = &entity_cores[k_key],
+                            pos = k_pos,
+                            vel = k_vel,
+                            gen = step,
+                            age = 1,
+                            status = .Active,
+                            life = entity_cores[k_key].maxlife,
+                            maxlife = entity_cores[k_key].maxlife,
+                            decay = entity_cores[k_key].decay,
+                            complexity = 0,
+                            num_vars = make(map[string]f32),
+                            str_vars = make(map[string]string),
+                            data = "KNOT",
+                            parent = "",
+                            owner = 0
+                        })
+                    }
+
+                    delete(ex_b)
+                    delete(close)
+                case "block":
+
+                    close := hash_find_2(snip^.pos, snip^.core.range * 3, { .Snip })
+                    blk_b := make([dynamic]^Entity)
+                    blk_b_2 := make([dynamic]^Entity)
+                    for sn in close {
+                        if snip^.id != sn^.id && sn^.core.sub_type == "block" {
+                            append(&blk_b_2, sn)
+                            dist := rl.Vector2Distance(snip^.pos, sn^.pos)
+                            if dist <= snip^.core.range && len(blk_b) < brane_count - 1 {
+                                append(&blk_b, sn)
+                            }
+                        }
+                    }
+
+                    if len(blk_b) == brane_count - 1 {
+                        b_pos := snip^.pos
+                        b_vel := snip^.vel
+                        b_w := snip^.core.weight
+                        for sn in blk_b {
+                            sn^.status = .Inactive
+                            b_pos += sn^.pos
+                            b_vel = momentum_add(b_vel, b_w, sn^.vel, sn^.core.weight)
+                        }
+
+                        snip^.status = .Inactive
+                        b_id := build_id(.Struck)
+                        b_pos /= 3
+                        b_key:string = "struck.brane"
+
+                        brn_id := build_id(.Struck)
+                        append(&entities, Entity{
+                            id = brn_id,
+                            core = &entity_cores[b_key],
+                            pos = b_pos,
+                            vel = b_vel,
+                            gen = step,
+                            age = 1,
+                            status = .Active,
+                            life = entity_cores[b_key].maxlife,
+                            maxlife = entity_cores[b_key].maxlife,
+                            decay = entity_cores[b_key].decay,
+                            complexity = 0,
+                            num_vars = make(map[string]f32),
+                            str_vars = make(map[string]string),
+                            data = "BRANE",
+                            parent = "",
+                            owner = 0
+                        })
+                    }
+                    else if len(blk_b_2) > 0 {
+                        t_pos := blk_b_2[0]^.pos
+                        t_ang := mth.atan2(t_pos.y - snip^.pos.y, t_pos.x - snip^.pos.x) * 180 / mth.π
+                        snip^.vel.y = t_ang
+                        dist := rl.Vector2Distance(snip^.pos, t_pos)
+                        min_dist := snip^.core.range * 1.5
+                        if dist > min_dist && snip^.vel.x < 0.1 {
+                            snip^.vel.x = 0.05
+                        } else if dist <= snip^.core.range {
+                            snip^.vel.y = snip^.vel.y - 180 < 0 ? 180 + snip^.vel.y : snip^.vel.y - 180
+                            if snip^.vel.x == 0 {
+                                snip^.vel.x = 0.05
+                            }
+                        } else if dist <= min_dist {
+                            if snip^.vel.x > 0 {
+                                snip^.vel.x = snip^.vel.x - 0.1 > 0 ? snip^.vel.x - 0.1 : 0 
+                            }
+                        }
+                    }
+
+                    delete(blk_b)
+                    delete(blk_b_2)
                     delete(close)
             }
         }
@@ -531,12 +669,14 @@ run_proto :: proc(proto:^Entity) {
     
 }
 
-run_comp :: proc(comp:^Entity) {
-    
-}
-
-run_xtra :: proc(xtra:^Entity) {
-    
+run_struck :: proc(struck:^Entity) {
+    if struck.status == .Active {
+        switch struck^.core.sub_type {
+            case "brane":
+            case "knot":
+            case "husk":
+        }
+    }
 }
 
 decay_entity :: proc(ent:^Entity) {
@@ -552,10 +692,8 @@ decay_entity :: proc(ent:^Entity) {
                 decay_strand(ent^.pos, ent^.core.sub_type, ent^.data)
             case .Proto:
                 //decay_proto(ent)
-            case .Comp:
-                decay_comp(ent^.pos, ent^.core.sub_type)
-            case .Xtra:
-                //decay_xtra(ent)
+            case .Struck:
+                decay_struck(ent^.pos, ent^.core.sub_type)
         }
     }
 }
@@ -606,7 +744,6 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
 
         o_id:string = build_id(.Ort)
         o_key:string = strings.concatenate({"ort.P"})
-        id_seed += 1
         append(&entities, Entity{
             id = o_id,
             core = &entity_cores[o_key],
@@ -623,8 +760,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
             str_vars = make(map[string]string),
             data = "P",
             parent = "",
-            next = nil,
-            prev = nil
+            owner = 0
         })
         haze_transact(pos, "x", 2)
     } else {
@@ -647,7 +783,6 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
 
             o_id:string = build_id(.Ort)
             o_key:string = strings.concatenate({"ort.", c_str})
-            id_seed += 1
             append(&entities, Entity{
                 id = o_id,
                 core = &entity_cores[o_key],
@@ -664,8 +799,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
                 str_vars = make(map[string]string),
                 data = c_str,
                 parent = "",
-                next = nil,
-                prev = nil
+                owner = 0
             })
 
             n_dir += (360 / f32(len(code)))
@@ -686,11 +820,7 @@ decay_proto :: proc(strand:^Entity) {
     
 }
 
-decay_comp :: proc(pos:rl.Vector2, sub_type:string) {
-    
-}
-
-decay_xtra :: proc(xtra:^Entity) {
+decay_struck :: proc(pos:rl.Vector2, sub_type:string) {
     
 }
 
@@ -708,7 +838,7 @@ build_id :: proc(e_type:Entity_Type) -> string {
         case .None:
             ret_str = "na"
         case .Chem:
-            ret_str = "sp"
+            ret_str = "ch"
         case .Ort:
             ret_str = "o"
         case .Snip:
@@ -717,10 +847,8 @@ build_id :: proc(e_type:Entity_Type) -> string {
             ret_str = "st"
         case .Proto:
             ret_str = "p"
-        case .Comp:
-            ret_str = "k"
-        case .Xtra:
-            ret_str = "x"
+        case .Struck:
+            ret_str = "sk"
     }
 
     ret_str = strings.concatenate({ret_str, "-", e_num})
@@ -742,10 +870,8 @@ type_name :: proc(e_type:Entity_Type) -> string {
             return "Strand"
         case .Proto:
             return "Proto"
-        case .Comp:
-            return "Complex"
-        case .Xtra:
-            return "Extra"
+        case .Struck:
+            return "Struct"
     }
     return "Uknown"
 }
@@ -808,10 +934,16 @@ class_name :: proc(e_type:Entity_Type, sub_type:string) -> string {
                     return "Simple"
             }
             return "Unknown"
-        case .Comp:
-            return "Complex"
-        case .Xtra:
-            return "Extra"
+        case .Struck:
+            switch sub_type {
+                case "brane":
+                    return "S-brane"
+                case "knot":
+                    return "Knot"
+                case "husk":
+                    return "Husk"
+            }
+            return "Uknown"
     }
     return "Uknown"
 }

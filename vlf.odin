@@ -14,14 +14,19 @@ visc:f32 : 0.3
 entities := make([dynamic]Entity)
 
 Flags :: enum {
-    EnvironmentDisplay,
-    ItemDisplay
+    Shift,
+    Cntl,
+    ItemDisplay,
+    Left,
+    Right,
+    Up,
+    Down
 }
 
 Event_Type :: enum {
     Click,
     DoubleClick,
-    KeyPress
+    PlayerAction1,
 }
 
 Event :: struct {
@@ -30,12 +35,18 @@ Event :: struct {
     pos:rl.Vector2
 }
 
+run_test:bool = false
+show_debug:bool = false
 set_flags:bit_set[Flags]
 events := make([dynamic]Event)
 mouse_pos:rl.Vector2 = { 0, 0 }
 
 info_item:^Entity = nil
 info_item_timer:int = 0
+
+active_player:int = -1
+player_dir_delta:f32 = 2
+player_beam_delta:f32 = 0.01
 
 vlf_init :: proc() {
 
@@ -45,8 +56,17 @@ vlf_init :: proc() {
 
     init_haze()
 
+    if run_test {
+        //vlf_test_init("brane1")
+    }
+
     init_hash()
 
+    active_player = add_player("Player 1", 1, {100,245,100,255}, {active_width / 2, active_height})
+
+    if show_debug {
+        fmt.println("\n\n\n\n\n\n")
+    }
 }
 
 vlf_run :: proc() {
@@ -56,6 +76,22 @@ vlf_run :: proc() {
         info_item_timer -= 1
     } else if info_item_timer == 0 {
         info_item = nil
+    }
+
+    if .Left in set_flags && active_player >= 0 {
+        players[active_player].dir = players[active_player].dir - player_dir_delta < -80 ? -80 : players[active_player].dir - player_dir_delta 
+    }
+
+    if .Right in set_flags && active_player >= 0 {
+        players[active_player].dir = players[active_player].dir + player_dir_delta > 80 ? 80 : players[active_player].dir + player_dir_delta 
+    }
+
+    if .Up in set_flags && active_player >= 0 {
+        players[active_player].beam_strength = players[active_player].beam_strength + player_beam_delta > 1 ? 1 : players[active_player].beam_strength + player_beam_delta 
+    }
+
+    if .Down in set_flags && active_player >= 0 {
+        players[active_player].beam_strength = players[active_player].beam_strength - player_beam_delta < 0.1 ? 0.1 : players[active_player].beam_strength - player_beam_delta
     }
 
     build_hash()
@@ -69,6 +105,8 @@ vlf_run :: proc() {
 			run_entity(&ent)
 		}
 	}
+
+    run_items()
 
     buff_id := ""
     if info_item != nil {
@@ -87,6 +125,20 @@ vlf_run :: proc() {
 	}
 
     shrink(&entities)
+
+    if show_debug {
+        if step %% 48 == 0 {
+            if step > 0 {
+                fmt.println("\x1b[7;A")
+            }
+            fmt.println("                                \rentities: ",(len(entities) * size_of(Entity)))
+            fmt.println("                                \rhash: ",hash_size_of())
+            fmt.println("                                \rhaze: ",haze_size_of())
+            fmt.println("                                \rtext_cache: ",size_of(textures))
+            fmt.println("                                \rimg_cache: ",size_of(src_images))
+            fmt.println("                                \r-----------------------------")
+        }
+    }
 }
 
 vlf_end :: proc() {
@@ -99,11 +151,44 @@ vlf_end :: proc() {
         clear(&clear2)
     }
 
-    delete(&entities)
+    delete(entities)
     graphics_end()
     hash_end()
     haze_end()
     //mem.scratch_destroy(&alloc)
+}
+
+vlf_test_init :: proc(ver:string) {
+    switch ver {
+        case "brane1":
+            for t := 0; t < 10; t += 1 {
+                brn_id := build_id(.Struck)
+                brn_x:f32 = mth.floor(rand.float32() * active_width)
+                brn_y:f32 = mth.floor(rand.float32() * active_height)
+                brn_v:f32 = 0.5
+                brn_a:f32 = rand.float32() * 360
+                b_key := "struck.brane"
+
+                append(&entities, Entity{
+                    id = brn_id,
+                    core = &entity_cores[b_key],
+                    pos = { brn_x, brn_y },
+                    vel = { brn_v, brn_a },
+                    gen = step,
+                    age = 1,
+                    status = .Active,
+                    life = entity_cores[b_key].maxlife,
+                    maxlife = entity_cores[b_key].maxlife,
+                    decay = entity_cores[b_key].decay,
+                    complexity = 0,
+                    num_vars = make(map[string]f32),
+                    str_vars = make(map[string]string),
+                    data = "BRANE",
+                    parent = "",
+                    owner = 0
+                })
+            }
+    }
 }
 
 info_click :: proc(pos:rl.Vector2) {
@@ -143,22 +228,25 @@ run_events :: proc() {
 run_event :: proc(event:^Event) {
     switch event^.e_type {
         case .Click:
-            if .ItemDisplay in event^.flags {
+            if .Shift in event^.flags {
                 info_click(event^.pos)
             }
         case .DoubleClick:
-            p_power:f32 = 5
-            p_range:f32 = active_width * 0.1
-            hits := hash_find_2(event^.pos, p_range)
-            for hit in hits {
-                ang:f32 = mth.atan2(hit^.pos.y - event^.pos.y, hit^.pos.x - event^.pos.x) * 180 / mth.π
-                dist:f32 = rl.Vector2Distance(event^.pos, hit^.pos)
-                p_power2:f32 = p_power * (1 - (dist / p_range))
-                p_power2 += hit^.vel.x
-                hit^.vel = { p_power2, ang}
+            // p_power:f32 = 5
+            // p_range:f32 = active_width * 0.1
+            // hits := hash_find_2(event^.pos, p_range)
+            // for hit in hits {
+            //     ang:f32 = mth.atan2(hit^.pos.y - event^.pos.y, hit^.pos.x - event^.pos.x) * 180 / mth.π
+            //     dist:f32 = rl.Vector2Distance(event^.pos, hit^.pos)
+            //     p_power2:f32 = p_power * (1 - (dist / p_range))
+            //     p_power2 += hit^.vel.x
+            //     hit^.vel = { p_power2, ang}
+            // }
+            // delete(hits)
+        case .PlayerAction1:
+            if active_player >= 0 {
+                run_player_event(&players[active_player], .Shoot)
             }
-            delete(hits)
-        case .KeyPress:
     }
 }
 

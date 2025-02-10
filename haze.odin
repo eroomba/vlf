@@ -64,6 +64,10 @@ haze_end :: proc() {
     delete(haze)
 }
 
+haze_size_of :: proc() -> int {
+    return len(haze) * size_of(Haze_Node)
+}
+
 run_haze :: proc() {
     for i := 0; i < len(haze); i += 1 {
         for form in haze_formulas {
@@ -90,7 +94,6 @@ run_haze :: proc() {
                 }
 
                 o_id := build_id(.Ort)
-                id_seed += 1
                 append(&entities, Entity{
                     id = o_id,
                     core = &entity_cores[o_sub_type_key],
@@ -107,8 +110,7 @@ run_haze :: proc() {
                     str_vars = make(map[string]string),
                     data = form.result_sub_type,
                     parent = "",
-                    next = nil,
-                    prev = nil
+                    owner = 0
                 })
             } 
         }

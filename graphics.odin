@@ -22,15 +22,15 @@ t_ort_idx := -1
 t_snip_idx := -1
 t_strand_idx := -1
 t_proto_idx := -1
-t_comp_idx := -1
-t_xtra_idx := -1
+t_struck_idx := -1
+t_item_idx := -1
 
 i_ort_idx := -1
 i_snip_idx := -1
 i_strand_idx := -1
 i_proto_idx := -1
-i_comp_idx := -1
-i_xtra_idx := -1
+i_struck_idx := -1
+i_item_idx := -1
 
 vlf_draw :: proc() {
 
@@ -42,12 +42,61 @@ vlf_draw :: proc() {
 		}
 	}
 
-	if .EnvironmentDisplay in set_flags {
+	if .Cntl in set_flags {
 		draw_environment()
 	}
 
 	if info_item != nil && info_item^.status == .Active && info_item_timer > 0 {
 		draw_info()
+	}
+
+	for &item in items {
+		draw_item(&item)
+	}
+
+	draw_player()
+}
+
+draw_player :: proc() {
+	if active_player >= 0 {
+		c_len:f32 = 20
+		c_color:rl.Color = { 71, 224, 224, 255 }
+		pos_1:rl.Vector2 = players[active_player].pos
+		pos_2 := pos_1
+		dir_2 := players[active_player].dir + 270
+		pos_2.x += c_len * mth.cos(dir_2 * mth.π / 180)
+		pos_2.y += c_len * mth.sin(dir_2 * mth.π / 180)
+		rl.DrawLineEx(pos_1, pos_2, 8, c_color)
+		rl.DrawCircleV(pos_1, 10, c_color)
+	}
+}
+
+draw_item :: proc(item:^Item) {
+	if item^.status == .Active {
+		switch item^.i_type {
+			case .None:
+			case .Beam:
+				step := item^.num_vars["step"]
+				dist := item^.num_vars["dist"]
+
+				h_pos := item^.pos
+				h_pos.x += dist * mth.cos(item^.vel.y * mth.π / 180)
+				h_pos.y += dist * mth.sin(item^.vel.y * mth.π / 180)
+
+				if step < 9 {
+					l_op:f32 = 60
+					l_op_3 := mth.floor(l_op * step / 9)
+					l_op_2 := mth.floor(l_op_3 * 0.66)
+					l_op_1 := mth.floor(l_op_3 * 0.33)
+					rl.DrawLineEx(item^.pos, h_pos, 5, {0, 255, 0, u8(l_op_1)})
+					rl.DrawLineEx(item^.pos, h_pos, 3, {0, 255, 0, u8(l_op_2)})
+					rl.DrawLineEx(item^.pos, h_pos, 1, {0, 255, 0, u8(l_op_3)})
+					rl.DrawCircleV(h_pos, 5, {0, 255, 0, u8(l_op_3)})
+				} else {
+					b_rad:f32 = f32((step - 5) * 10)
+					rl.DrawCircleLinesV(h_pos, b_rad, {0, 255, 0, 240})
+				}
+		}
 	}
 }
 
@@ -112,17 +161,16 @@ draw_info :: proc() {
 
 				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
 			case .Proto:
-			case .Comp:
+			case .Struck:
 				info_params.color[3] = 255
 
-				comp_th:f32 = 80
-				comp_tw:f32 = (info_params.rect.width / info_params.rect.height) * comp_th
+				struck_th:f32 = 80
+				struck_tw:f32 = (info_params.rect.width / info_params.rect.height) * struck_th
 
-				t_x:f32 = (f32(info_w) / 2) - (comp_tw / 2)
+				t_x:f32 = (f32(info_w) / 2) - (struck_tw / 2)
 				t_y:f32 = f32(padding)
 
-				rl.ImageDraw(&info, src_images[i_comp_idx], info_params.rect, {t_x, t_y, comp_tw, comp_th }, info_params.color)
-			case .Xtra:
+				rl.ImageDraw(&info, src_images[i_struck_idx], info_params.rect, {t_x, t_y, struck_tw, struck_th }, info_params.color)
 		}
 
 
@@ -184,8 +232,7 @@ draw_info :: proc() {
 
 				delete(code_parts)
 			case .Proto:
-			case .Comp:
-			case .Xtra:
+			case .Struck:
 		}
 
 		filter := rl.TextureFilter.BILINEAR
@@ -311,15 +358,18 @@ draw_entity :: proc(ent:^Entity) {
 			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
 			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
 		case .Proto:
-		case .Comp:
-			cmp_params := item_draw_params(ent)
+		case .Struck:
+			stk_params := item_draw_params(ent)
 			if ent^.decay <= 10 {
-				cmp_params.color[3] = u8(f32(cmp_params.color[3]) * (f32(ent^.decay) / 10))
+				stk_params.color[3] = u8(f32(stk_params.color[3]) * (f32(ent^.decay) / 10))
 			}
-			comp_th:f32 = mth.floor(screen_height * 0.017)
-			comp_tw:f32 = (cmp_params.rect.width / cmp_params.rect.height) * comp_th
-			rl.DrawTexturePro(textures[t_comp_idx], cmp_params.rect, {ent.pos.x, ent.pos.y, comp_tw, comp_th }, {comp_tw / 2, comp_th / 2}, ent.vel.y, cmp_params.color)
-		case .Xtra:
+			stk_rot := ent.vel.y
+			if ent^.core.sub_type == "brane" || ent^.core.sub_type == "husk" {
+				stk_rot = 0
+			}
+			struck_th:f32 = mth.floor(screen_height * 0.028)
+			struck_tw:f32 = (stk_params.rect.width / stk_params.rect.height) * struck_th
+			rl.DrawTexturePro(textures[t_struck_idx], stk_params.rect, {ent.pos.x, ent.pos.y, struck_tw, struck_th }, {struck_tw / 2, struck_th / 2}, stk_rot, stk_params.color)
 	}
 }
 
@@ -362,7 +412,13 @@ init_graphics :: proc() {
 
 	rl.UnloadImage(x_img)
 
-	orts_img := rl.LoadImage("./images/orts.png")
+	img_loader:[]u8
+	data_size:i32
+
+	img_loader = #load("./images/orts.png")
+	data_size = i32(len(img_loader))
+	orts_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
 	orts := rl.LoadTextureFromImage(orts_img)
 	rl.GenTextureMipmaps(&orts)
 	rl.SetTextureFilter(orts, filter)
@@ -374,7 +430,10 @@ init_graphics :: proc() {
 	i_idx += 1
 	
 
-	snips_img := rl.LoadImage("./images/snips.png")
+	img_loader = #load("./images/snips.png")
+	data_size = i32(len(img_loader))
+	snips_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
 	snips := rl.LoadTextureFromImage(snips_img)
 	rl.GenTextureMipmaps(&snips)
 	rl.SetTextureFilter(snips, filter)
@@ -385,7 +444,10 @@ init_graphics :: proc() {
 	i_snip_idx = i_idx
 	i_idx += 1
 
-	strands_img := rl.LoadImage("./images/strands.png")
+	img_loader = #load("./images/strands.png")
+	data_size = i32(len(img_loader))
+	strands_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
 	strands := rl.LoadTextureFromImage(strands_img)
 	rl.GenTextureMipmaps(&strands)
 	rl.SetTextureFilter(strands, filter)
@@ -396,16 +458,18 @@ init_graphics :: proc() {
 	i_strand_idx = i_idx
 	i_idx += 1
 
-
-	comps_img := rl.LoadImage("./images/comps.png")
-	comps := rl.LoadTextureFromImage(comps_img)
-	rl.GenTextureMipmaps(&comps)
-	rl.SetTextureFilter(comps, filter)
-	textures[t_idx] = comps
-	src_images[i_idx] = comps_img
-	t_comp_idx = t_idx
+	img_loader = #load("./images/strucks.png")
+	data_size = i32(len(img_loader))
+	strucks_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
+	strucks := rl.LoadTextureFromImage(strucks_img)
+	rl.GenTextureMipmaps(&strucks)
+	rl.SetTextureFilter(strucks, filter)
+	textures[t_idx] = strucks
+	src_images[i_idx] = strucks_img
+	t_struck_idx = t_idx
 	t_idx += 1
-	i_comp_idx = i_idx
+	i_struck_idx = i_idx
 	i_idx += 1
 }
 
@@ -529,29 +593,28 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			
 			ret_rec = {offset_x, offset_y, strand_ow, strand_oh}
 		case .Proto:
-		case .Comp:
+		case .Struck:
 			offset_x:f32 = 0
 			offset_y:f32 = 0
-			cmp_alpha:u8 = 190
-			ret_color = { 102, 102, 102, cmp_alpha}
+			stk_alpha:u8 = 100
+			ret_color = { 102, 102, 102, stk_alpha}
 
 			switch ent^.core.sub_type {
 				case "brane":
 					offset_y = 0
-					ret_color = { 220, 220, 220, cmp_alpha}
-				case "nugget":
+					ret_color = { 0, 230, 230, stk_alpha}
+				case "knot":
 					offset_y = 200
-					ret_color = { 100, 240, 100, cmp_alpha}
+					ret_color = { 100, 240, 100, stk_alpha - 10}
 				case "husk":
 					offset_y = 400
-					ret_color = { 200, 200, 200, cmp_alpha}
+					ret_color = { 100, 200, 200, stk_alpha}
 			}
 
-			comp_ow:f32 = 200
-			comp_oh:f32 = 200
+			struck_ow:f32 = 200
+			struck_oh:f32 = 200
 			
-			ret_rec = {offset_x, offset_y, comp_ow, comp_oh}
-		case .Xtra:
+			ret_rec = {offset_x, offset_y, struck_ow, struck_oh}
 	}
 
 	return Graphics_Params{

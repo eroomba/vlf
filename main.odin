@@ -38,16 +38,56 @@ main :: proc() {
 		}
 
 		if rl.IsKeyDown(rl.KeyboardKey.LEFT_CONTROL) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_CONTROL) {
-			set_flags += { .EnvironmentDisplay }
+			set_flags += { .Cntl }
 		} else {
-			set_flags -= { .EnvironmentDisplay }
+			set_flags -= { .Cntl }
 		}
 
         if rl.IsKeyDown(rl.KeyboardKey.LEFT_SHIFT) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_SHIFT) {
-			set_flags += { .ItemDisplay }
+			set_flags += { .Shift }
 		} else {
-			set_flags -= { .ItemDisplay }
+			set_flags -= { .Shift }
 		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT) || rl.IsKeyDown(rl.KeyboardKey.A) {
+			set_flags += { .Left }
+		} else {
+			set_flags -= { .Left }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.RIGHT) || rl.IsKeyDown(rl.KeyboardKey.D) {
+			set_flags += { .Right }
+		} else {
+			set_flags -= { .Right }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.UP) || rl.IsKeyDown(rl.KeyboardKey.W) {
+			set_flags += { .Up }
+		} else {
+			set_flags -= { .Up }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.DOWN) || rl.IsKeyDown(rl.KeyboardKey.R) {
+			set_flags += { .Down }
+		} else {
+			set_flags -= { .Down }
+		}
+
+		key := rl.GetCharPressed()
+
+		// Check if more characters have been pressed on the same frame
+		for key > 0 {
+			if key == 32 {
+				inject_at(&events, 0, Event{
+					e_type = .ShootPress,
+					flags = set_flags + {},
+					pos = mouse_pos
+				})
+			}
+
+			key = rl.GetCharPressed()  // Check next character in the queue
+		}
+
 
 		mouse_pos = rl.GetMousePosition()
 
@@ -66,7 +106,7 @@ main :: proc() {
 				})
 			}
 
-			mouse_button_timer[0] = 10
+			mouse_button_timer[0] = 16
 		}
 
 		delta += rl.GetFrameTime()
