@@ -99,6 +99,7 @@ run_haze :: proc() {
                     core = &entity_cores[o_sub_type_key],
                     pos = {o_x, o_y },
                     vel = { o_vel, o_dir },
+                    dir = 0,
                     gen = step,
                     age = 1,
                     status = .Active,

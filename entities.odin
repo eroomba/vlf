@@ -100,6 +100,7 @@ Entity :: struct {
     core:^Entity_Core,
     pos:rl.Vector2,
     vel:rl.Vector2,
+    dir:f32,
     gen:int,
     age:int,
     status:Entity_Status,
@@ -197,6 +198,26 @@ init_cores :: proc() {
             maxlife = 100
         }
     }
+
+    entity_cores["proto.Simple"] = Entity_Core{
+        e_type = Entity_Type.Proto,
+        sub_type = "Simple",
+        weight = 0.3,
+        data = "",
+        range = 20,
+        decay = 50000,
+        maxlife = 100
+    }
+
+    entity_cores["proto.Complex"] = Entity_Core{
+        e_type = Entity_Type.Proto,
+        sub_type = "Complex",
+        weight = 0.4,
+        data = "",
+        range = 20,
+        decay = 50000,
+        maxlife = 100
+    }
 }
 
 run_entity :: proc(ent:^Entity) {
@@ -221,7 +242,7 @@ run_entity :: proc(ent:^Entity) {
         if ent.vel.x == 0 {
             ent^.vel.x = 0.05
         } else if ent.vel.x < 1.5 {
-            ent^.vel.y += 2 - (rand.float32() * 5)
+            ent^.vel.y += 2 - mth.floor(rand.float32() * 5)
         }
 
         if ent.vel.x != 0 {
@@ -280,6 +301,7 @@ run_ort :: proc(ort:^Entity) {
                         core = &entity_cores[sn_key],
                         pos = sn_pos,
                         vel = sn_vel,
+                        dir = 0,
                         gen = step,
                         age = 1,
                         status = .Active,
@@ -329,6 +351,7 @@ run_ort :: proc(ort:^Entity) {
                             core = &entity_cores[sn_key],
                             pos = sn_pos,
                             vel = sn_vel,
+                            dir = 0,
                             gen = step,
                             age = 1,
                             status = .Active,
@@ -364,6 +387,7 @@ run_ort :: proc(ort:^Entity) {
                         core = &entity_cores[sn_key],
                         pos = sn_pos,
                         vel = sn_vel,
+                        dir = 0,
                         gen = step,
                         age = 1,
                         status = .Active,
@@ -420,6 +444,7 @@ run_snip :: proc(snip:^Entity) {
                             core = &entity_cores[sn_key],
                             pos = sn_pos,
                             vel = sn_vel,
+                            dir = 0,
                             gen = step,
                             age = 1,
                             status = .Active,
@@ -476,6 +501,7 @@ run_snip :: proc(snip:^Entity) {
                                 core = &entity_cores[st_key],
                                 pos = st_pos,
                                 vel = st_vel,
+                                dir = 0,
                                 gen = step,
                                 age = 1,
                                 status = .Active,
@@ -523,6 +549,7 @@ run_snip :: proc(snip:^Entity) {
                             core = &entity_cores[k_key],
                             pos = k_pos,
                             vel = k_vel,
+                            dir = 0,
                             gen = step,
                             age = 1,
                             status = .Active,
@@ -576,6 +603,7 @@ run_snip :: proc(snip:^Entity) {
                             core = &entity_cores[b_key],
                             pos = b_pos,
                             vel = b_vel,
+                            dir = 0,
                             gen = step,
                             age = 1,
                             status = .Active,
@@ -630,15 +658,18 @@ run_strand :: proc(strand:^Entity) {
             strand^.status = .Inactive
             decay_entity(strand)
         } else {
-            close := hash_find(strand, { .Snip, .Strand })
+            close := hash_find(strand, {.Snip, .Strand, .Struck})
             combined:bool = false
+            brane:^Entity = nil
 
             st_vel := strand^.vel
             st_weight := strand^.core.weight
 
             for ent in close {
-                if (!strings.contains(strand^.data,"U") && !strings.contains(ent^.data,"U")) ||
-                    (strings.contains(strand^.data,"U") && strings.contains(ent^.data,"U")) {
+                if strand^.core.sub_type == "D" && ent^.core.e_type == .Struck && ent^.core.sub_type == "brane" && brane == nil {
+                    brane = ent
+                } else if ent^.core.e_type == .Snip || ent^.core.e_type == .Strand {
+                    if (!strings.contains(strand^.data,"U") && !strings.contains(ent^.data,"U")) || (strings.contains(strand^.data,"U") && strings.contains(ent^.data,"U")) {
                         if (ent^.core.e_type == .Snip && ent^.core.sub_type == "go") || ent^.core.e_type == .Strand {
                             ent^.status = .Inactive
                             strand^.data = strings.concatenate({strand^.data, ent^.data})
@@ -646,10 +677,41 @@ run_strand :: proc(strand:^Entity) {
                             combined = true
                         }
                     }
+                } 
             }
             delete(close)
 
-            if combined {
+            if brane != nil {
+                pro_id := build_id(.Proto)
+                pro_key:string = "proto.Simple"
+                pro_data:string = strand^.data
+
+                pro_pos := strand^.pos
+                pro_vel := strand^.vel
+
+                append(&entities, Entity{
+                    id = pro_id,
+                    core = &entity_cores[pro_key],
+                    pos = pro_pos,
+                    vel = pro_vel,
+                    dir = rand.float32() * 360,
+                    gen = step,
+                    age = 1,
+                    status = .Active,
+                    life = entity_cores[pro_key].maxlife,
+                    maxlife = entity_cores[pro_key].maxlife,
+                    decay = entity_cores[pro_key].decay,
+                    complexity = 1,
+                    num_vars = make(map[string]f32),
+                    str_vars = make(map[string]string),
+                    data = pro_data,
+                    parent = "",
+                    owner = 0
+                })
+
+                brane^.status = .Inactive
+                strand^.status = .Inactive
+            } else if combined {
                 strand^.decay = strand^.core.decay
                 types := check_type(strand^.data)
                 strand^.vel = st_vel
@@ -666,7 +728,38 @@ run_strand :: proc(strand:^Entity) {
 }
 
 run_proto :: proc(proto:^Entity) {
-    
+    if proto^.status == .Active {
+        if step %% 24 == 0 {
+            proto^.life -= 1
+        }
+        if proto^.life <= 0 {
+            proto^.status = .Inactive
+            decay_entity(proto)
+        } else {
+            
+            if proto^.core.sub_type == "Complex" {
+                if !("t_step" in proto^.num_vars) {
+                    proto^.num_vars["t_step"] = 0
+                }
+            }
+
+            if proto^.core.sub_type == "Simple" && step %% 6 == 0 {
+                d_rand := rand.float32() 
+                if d_rand > 0.9 {
+                    proto^.dir += mth.floor(rand.float32() * 4)
+                } else if d_rand < 0.1 {
+                    proto^.dir -= mth.floor(rand.float32() * 4)
+                }
+                if proto^.dir < 0 {
+                    proto^.dir += 360
+                } else if proto^.dir > 360 {
+                    proto^.dir -= 360
+                }
+            }
+
+            run_code(proto)
+        }
+    }
 }
 
 run_struck :: proc(struck:^Entity) {
@@ -749,6 +842,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
             core = &entity_cores[o_key],
             pos = {pos.x + x_dir, pos.y + y_dir},
             vel = {n_vel, n_dir},
+            dir = 0,
             gen = step,
             age = 1,
             status = .Active,
@@ -788,6 +882,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
                 core = &entity_cores[o_key],
                 pos = {pos.x + x_dir, pos.y + y_dir},
                 vel = {n_vel, n_dir},
+                dir = 0,
                 gen = step,
                 age = 1,
                 status = .Active,

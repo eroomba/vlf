@@ -10,7 +10,7 @@ import "core:math/rand"
 
 Item_Type :: enum {
     None,
-    Beam
+    Pulse
 }
 
 Item_Status :: enum {
@@ -49,15 +49,12 @@ run_item :: proc(item:^Item) {
     if item^.status == .Active {
         switch item^.i_type {
             case .None:
-            case .Beam:
+            case .Pulse:
                 power := item^.num_vars["power"]
                 step := item^.num_vars["step"]
-                dist := item^.num_vars["dist"]
+                h_pos := item^.pos
 
-                if step == 5 {
-                    h_pos := item^.pos
-                    h_pos.x += dist * mth.cos(item^.vel.y * mth.π / 180)
-                    h_pos.y += dist * mth.sin(item^.vel.y * mth.π / 180)
+                if step == 0 {
 
                     h_range:f32 = active_width * 0.1
                     hits := hash_find_2(h_pos, h_range)
@@ -65,13 +62,13 @@ run_item :: proc(item:^Item) {
                         ang:f32 = mth.atan2(hit^.pos.y - h_pos.y, hit^.pos.x - h_pos.x) * 180 / mth.π
                         dist:f32 = rl.Vector2Distance(h_pos, hit^.pos)
                         power2:f32 = power * (1 - (dist / h_range))
-                        power2 += hit^.vel.x
-                        hit^.vel = { power2, ang}
+                        hit^.vel.x = power2
+                        hit^.vel.y = ang
                     }
                     delete(hits)
                 } 
                 
-                if step >= 11 {
+                if step >= 8 {
                     item^.status = .Inactive
                 } else {
                     item^.num_vars["step"] += 1

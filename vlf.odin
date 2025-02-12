@@ -25,8 +25,11 @@ Flags :: enum {
 
 Event_Type :: enum {
     Click,
+    Alt_Click,
     DoubleClick,
     PlayerAction1,
+    PlayerAction2,
+    PlayerAction3
 }
 
 Event :: struct {
@@ -35,7 +38,7 @@ Event :: struct {
     pos:rl.Vector2
 }
 
-run_test:bool = false
+run_test:bool = true
 show_debug:bool = false
 set_flags:bit_set[Flags]
 events := make([dynamic]Event)
@@ -44,9 +47,6 @@ mouse_pos:rl.Vector2 = { 0, 0 }
 info_item:^Entity = nil
 info_item_timer:int = 0
 
-active_player:int = -1
-player_dir_delta:f32 = 2
-player_beam_delta:f32 = 0.01
 
 vlf_init :: proc() {
 
@@ -57,20 +57,23 @@ vlf_init :: proc() {
     init_haze()
 
     if run_test {
-        //vlf_test_init("brane1")
+        vlf_test_init("proto1")
     }
 
     init_hash()
 
+    sys_player := add_player("System", 0, {0,0,0,0}, {0, 0})
+    players[sys_player].status = .Inactive
     active_player = add_player("Player 1", 1, {100,245,100,255}, {active_width / 2, active_height})
 
     if show_debug {
         fmt.println("\n\n\n\n\n\n")
     }
+
 }
 
 vlf_run :: proc() {
-    
+
     step += 1
     if info_item_timer > 0 {
         info_item_timer -= 1
@@ -79,19 +82,19 @@ vlf_run :: proc() {
     }
 
     if .Left in set_flags && active_player >= 0 {
-        players[active_player].dir = players[active_player].dir - player_dir_delta < -80 ? -80 : players[active_player].dir - player_dir_delta 
+        player_update_dir(&players[active_player], -1)
     }
 
     if .Right in set_flags && active_player >= 0 {
-        players[active_player].dir = players[active_player].dir + player_dir_delta > 80 ? 80 : players[active_player].dir + player_dir_delta 
+        player_update_dir(&players[active_player], 1)
     }
 
     if .Up in set_flags && active_player >= 0 {
-        players[active_player].beam_strength = players[active_player].beam_strength + player_beam_delta > 1 ? 1 : players[active_player].beam_strength + player_beam_delta 
+        player_update_reach(&players[active_player], 1)
     }
 
     if .Down in set_flags && active_player >= 0 {
-        players[active_player].beam_strength = players[active_player].beam_strength - player_beam_delta < 0.1 ? 0.1 : players[active_player].beam_strength - player_beam_delta
+        player_update_reach(&players[active_player], -1)
     }
 
     build_hash()
@@ -100,13 +103,17 @@ vlf_run :: proc() {
 
     run_events()
 
-    for &ent in entities {
+    e := len(entities)
+    for i in 0..<e {
+        ent := &entities[i]
 		if ent.status == .Active {
-			run_entity(&ent)
+			run_entity(ent)
 		}
 	}
 
     run_items()
+
+    run_players()
 
     buff_id := ""
     if info_item != nil {
@@ -174,6 +181,7 @@ vlf_test_init :: proc(ver:string) {
                     core = &entity_cores[b_key],
                     pos = { brn_x, brn_y },
                     vel = { brn_v, brn_a },
+                    dir = 0,
                     gen = step,
                     age = 1,
                     status = .Active,
@@ -188,6 +196,61 @@ vlf_test_init :: proc(ver:string) {
                     owner = 0
                 })
             }
+        case "proto1":
+            pr_id := build_id(.Proto)
+            pr_x:f32 = mth.floor(rand.float32() * active_width)
+            pr_y:f32 = mth.floor(rand.float32() * active_height)
+            pr_v:f32 = 0
+            pr_a:f32 = rand.float32() * 360
+            pr_key := "proto.Simple"
+            pro_nvars := make(map[string]f32)
+
+            append(&entities, Entity{
+                id = pr_id,
+                core = &entity_cores[pr_key],
+                pos = { pr_x, pr_y },
+                vel = { pr_v, pr_a },
+                dir = rand.float32() * 360,
+                gen = step,
+                age = 1,
+                status = .Active,
+                life = entity_cores[pr_key].maxlife,
+                maxlife = entity_cores[pr_key].maxlife,
+                decay = entity_cores[pr_key].decay,
+                complexity = 1,
+                num_vars = pro_nvars,
+                str_vars = make(map[string]string),
+                data = "ABDACB",
+                parent = "",
+                owner = 0
+            })
+
+            pr_id = build_id(.Proto)
+            pr_x = mth.floor(rand.float32() * active_width)
+            pr_y = mth.floor(rand.float32() * active_height)
+            pr_v = 0
+            pr_a = rand.float32() * 360
+            pr_key = "proto.Complex"
+
+            append(&entities, Entity{
+                id = pr_id,
+                core = &entity_cores[pr_key],
+                pos = { pr_x, pr_y },
+                vel = { pr_v, pr_a },
+                dir = 0,
+                gen = step,
+                age = 1,
+                status = .Active,
+                life = entity_cores[pr_key].maxlife,
+                maxlife = entity_cores[pr_key].maxlife,
+                decay = entity_cores[pr_key].decay,
+                complexity = 2,
+                num_vars = make(map[string]f32),
+                str_vars = make(map[string]string),
+                data = "AAAABD",
+                parent = "",
+                owner = 0
+            })
     }
 }
 
@@ -228,25 +291,26 @@ run_events :: proc() {
 run_event :: proc(event:^Event) {
     switch event^.e_type {
         case .Click:
-            if .Shift in event^.flags {
-                info_click(event^.pos)
-            }
+            close_info()
         case .DoubleClick:
-            // p_power:f32 = 5
-            // p_range:f32 = active_width * 0.1
-            // hits := hash_find_2(event^.pos, p_range)
-            // for hit in hits {
-            //     ang:f32 = mth.atan2(hit^.pos.y - event^.pos.y, hit^.pos.x - event^.pos.x) * 180 / mth.π
-            //     dist:f32 = rl.Vector2Distance(event^.pos, hit^.pos)
-            //     p_power2:f32 = p_power * (1 - (dist / p_range))
-            //     p_power2 += hit^.vel.x
-            //     hit^.vel = { p_power2, ang}
-            // }
-            // delete(hits)
+        case .Alt_Click:
+            info_click(event^.pos)
         case .PlayerAction1:
             if active_player >= 0 {
-                run_player_event(&players[active_player], .Shoot)
+                run_player_event(&players[active_player], .Activate)
             }
+        case .PlayerAction2:
+            if active_player >= 0 {
+                run_player_event(&players[active_player], .Toggle)
+            }
+        case .PlayerAction3:
+    }
+}
+
+close_info :: proc() {
+    if info_item != nil {
+        info_item =  nil
+        info_item_timer = 0
     }
 }
 

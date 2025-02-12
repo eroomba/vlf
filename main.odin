@@ -67,7 +67,7 @@ main :: proc() {
 			set_flags -= { .Up }
 		}
 
-		if rl.IsKeyDown(rl.KeyboardKey.DOWN) || rl.IsKeyDown(rl.KeyboardKey.R) {
+		if rl.IsKeyDown(rl.KeyboardKey.DOWN) || rl.IsKeyDown(rl.KeyboardKey.S) {
 			set_flags += { .Down }
 		} else {
 			set_flags -= { .Down }
@@ -77,9 +77,17 @@ main :: proc() {
 
 		// Check if more characters have been pressed on the same frame
 		for key > 0 {
-			if key == 32 {
+			if key == player_keys[0] {
 				inject_at(&events, 0, Event{
-					e_type = .ShootPress,
+					e_type = .PlayerAction1,
+					flags = set_flags + {},
+					pos = mouse_pos
+				})
+			}
+
+			if key == player_keys[1] {
+				inject_at(&events, 0, Event{
+					e_type = .PlayerAction2,
 					flags = set_flags + {},
 					pos = mouse_pos
 				})
@@ -109,6 +117,14 @@ main :: proc() {
 			mouse_button_timer[0] = 16
 		}
 
+		if rl.IsMouseButtonPressed(rl.MouseButton.RIGHT) {
+			inject_at(&events, 0, Event{
+				e_type = .Alt_Click,
+				flags = set_flags + {},
+				pos = mouse_pos
+			})
+		}
+
 		delta += rl.GetFrameTime()
 		runStep := false
 
@@ -128,7 +144,7 @@ main :: proc() {
 			rl.BeginDrawing()
 			rl.ClearBackground(rl.BLACK)
 
-			// draw game step
+			// draw game step	
 			vlf_draw()
 
 			rl.EndDrawing()

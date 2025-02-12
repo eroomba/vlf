@@ -13,7 +13,10 @@ Code_Action :: enum {
     Seek,
     Percieve,
     Chem,
-    Build
+    Build,
+    MoveS1,
+    MoveS2,
+    MoveS3
 }
 
 Code_Params :: struct {
@@ -21,6 +24,7 @@ Code_Params :: struct {
     act_percieve:bool,
     act_seek:bool,
     act_breathe:bool,
+    act_chem:bool,
     act_build:bool,
     move_speed:f32,
     range:f32,
@@ -36,6 +40,7 @@ run_code :: proc(ent:^Entity) {
         act_percieve = false,
         act_seek = false,
         act_breathe = false,
+        act_chem = false,
         act_build = false,
         move_speed = 0,
         range = ent^.core.range,
@@ -50,13 +55,13 @@ run_code :: proc(ent:^Entity) {
             curr_code:string = code[c-2:c+1]
             switch curr_code {
                 case "AAA":
-                    c_params.move_speed += 1
+                    c_params.move_speed += 0.2
                 case "AAB":
-                    c_params.move_speed += 1
+                    c_params.move_speed += 0.4
                 case "AAC":
-                    c_params.move_speed += 2
+                    c_params.move_speed += 0.6
                 case "AAD":
-                    c_params.move_speed += 2
+                    c_params.move_speed += 0.8
                 case "ABA":
                     c_params.range *= 3
                 case "ABB":
@@ -66,6 +71,7 @@ run_code :: proc(ent:^Entity) {
                 case "ABD":
                     if ent^.complexity > 0 {
                         c_params.act_move = true
+                        c_params.move_speed += 0.1
                     }
                 case "ACA":
                     c_params.breath_in = 1
@@ -122,6 +128,10 @@ run_code :: proc(ent:^Entity) {
             
         }
 
+        if c_params.act_chem {
+            
+        }
+
         if c_params.act_build {
             if ent^.num_vars["b_step"] < 3 {
                 close := hash_find(ent, {.Ort})
@@ -151,6 +161,7 @@ run_code :: proc(ent:^Entity) {
                     core = &entity_cores[sn_key],
                     pos = sn_pos,
                     vel = { sn_vel_x, sn_vel_y },
+                    dir = 0,
                     gen = step,
                     age = 1,
                     status = .Active,
@@ -184,12 +195,38 @@ check_type :: proc(code:string) -> bit_set[Code_Action] {
             ret_val += {.Build}
         }
 
-    if strings.contains(code,"ABB") {
+    if strings.contains(code,"ABD") {
         ret_val += {.Move}
+
+        m_speed:f32 = 0.1
+        if strings.contains(code,"AAA") {
+            m_speed += 0.2
+        }
+        if strings.contains(code,"AAB") {
+            m_speed += 0.4
+        }
+        if strings.contains(code,"AAC") {
+            m_speed += 0.6
+        }
+        if strings.contains(code,"AAD") {
+            m_speed += 0.8
+        }
+
+        if m_speed > 1.2 {
+            ret_val += {.MoveS3}
+        } else if m_speed > 0.6 {
+            ret_val += {.MoveS2}
+        } else {
+            ret_val += {.MoveS1}
+        }
     }
 
     if strings.contains(code,"ACB") {
         ret_val += {.Breathe}
+    }
+
+    if strings.contains(code,"ABB") {
+        ret_val += {.Seek}
     }
 
     return ret_val

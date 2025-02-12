@@ -5,23 +5,28 @@ import "core:strings"
 import mth "core:math"
 import rl "vendor:raylib"
 import "core:strconv"
+import "core:math/rand"
 
 Graphics_Params :: struct {
 	rect:rl.Rectangle,
 	color:rl.Color
 }
 
-src_images:[7]rl.Image
-textures:[7]rl.Texture2D
+src_images:[9]rl.Image
+textures:[11]rl.Texture2D
 font:rl.Font
+main_filter:rl.TextureFilter
 
 t_bg_idx := -1
 t_env_idx := -1
 t_info_idx := -1
+t_player_idx := -1
 t_ort_idx := -1
 t_snip_idx := -1
 t_strand_idx := -1
 t_proto_idx := -1
+t_proto_parts_idx := -1
+t_proto_draw_idx := -1
 t_struck_idx := -1
 t_item_idx := -1
 
@@ -29,6 +34,7 @@ i_ort_idx := -1
 i_snip_idx := -1
 i_strand_idx := -1
 i_proto_idx := -1
+i_proto_parts_idx := -1
 i_struck_idx := -1
 i_item_idx := -1
 
@@ -42,7 +48,7 @@ vlf_draw :: proc() {
 		}
 	}
 
-	if .Cntl in set_flags {
+	if .Shift in set_flags {
 		draw_environment()
 	}
 
@@ -57,46 +63,242 @@ vlf_draw :: proc() {
 	draw_player()
 }
 
-draw_player :: proc() {
-	if active_player >= 0 {
-		c_len:f32 = 20
-		c_color:rl.Color = { 71, 224, 224, 255 }
-		pos_1:rl.Vector2 = players[active_player].pos
-		pos_2 := pos_1
-		dir_2 := players[active_player].dir + 270
-		pos_2.x += c_len * mth.cos(dir_2 * mth.π / 180)
-		pos_2.y += c_len * mth.sin(dir_2 * mth.π / 180)
-		rl.DrawLineEx(pos_1, pos_2, 8, c_color)
-		rl.DrawCircleV(pos_1, 10, c_color)
-	}
-}
-
 draw_item :: proc(item:^Item) {
 	if item^.status == .Active {
 		switch item^.i_type {
 			case .None:
-			case .Beam:
+			case .Pulse:
 				step := item^.num_vars["step"]
-				dist := item^.num_vars["dist"]
+				p_pos := item^.pos
 
-				h_pos := item^.pos
-				h_pos.x += dist * mth.cos(item^.vel.y * mth.π / 180)
-				h_pos.y += dist * mth.sin(item^.vel.y * mth.π / 180)
-
-				if step < 9 {
-					l_op:f32 = 60
-					l_op_3 := mth.floor(l_op * step / 9)
-					l_op_2 := mth.floor(l_op_3 * 0.66)
-					l_op_1 := mth.floor(l_op_3 * 0.33)
-					rl.DrawLineEx(item^.pos, h_pos, 5, {0, 255, 0, u8(l_op_1)})
-					rl.DrawLineEx(item^.pos, h_pos, 3, {0, 255, 0, u8(l_op_2)})
-					rl.DrawLineEx(item^.pos, h_pos, 1, {0, 255, 0, u8(l_op_3)})
-					rl.DrawCircleV(h_pos, 5, {0, 255, 0, u8(l_op_3)})
-				} else {
-					b_rad:f32 = f32((step - 5) * 10)
-					rl.DrawCircleLinesV(h_pos, b_rad, {0, 255, 0, 240})
-				}
+				p_rad:f32 = player_tool_rad + f32(step * 5)
+				//p_alpha := u8(240 * (1 - (step / 5))) 
+				p_alpha:u8 = u8(240 - (((8 - u8(step)) / 8) * 200))
+				rl.DrawCircleLinesV(p_pos, p_rad, {180, 180, 255, p_alpha})
 		}
+	}
+}
+
+draw_entity :: proc(ent:^Entity) {
+	switch ent^.core.e_type {
+		case .None:
+		case .Chem:
+		case .Ort:
+			o_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent^.decay) / 10))
+			}
+			ort_thw:f32 = mth.floor(screen_height * 0.013)
+			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {ent.pos.x, ent.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, ent.vel.y, o_params.color)
+		case .Snip:
+			sn_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent^.decay) / 10))
+			}
+			snip_th:f32 = mth.floor(screen_height * 0.015)
+			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
+			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {ent.pos.x, ent.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, ent.vel.y, sn_params.color)
+		case .Strand:
+			st_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent^.decay) / 10))
+			}
+			strand_th:f32 = mth.floor(screen_height * 0.017)
+			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
+			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
+		case .Proto:
+			pr_params := item_draw_params(ent)
+			if ent^.life <= 10 {
+				pr_params.color[3] = u8(f32(pr_params.color[3]) * (f32(ent^.life) / 10))
+			}
+			proto_rot := ent^.dir
+			proto_th:f32 = mth.floor(screen_height * 0.032)
+			proto_tw:f32 = (pr_params.rect.width / pr_params.rect.height) * proto_th
+			proto_origin:rl.Vector2 = {proto_tw / 2, proto_th / 2}
+
+			pr_img:rl.Image = rl.GenImageColor(i32(proto_tw) * 2, i32(proto_th), {255, 255, 255, 0});
+			rl.ImageDraw(&pr_img, src_images[i_proto_idx], pr_params.rect, { 0, 0, proto_tw, proto_th}, rl.WHITE)
+
+			pr_types := check_type(ent^.data)
+
+			skin_color:rl.Color = { 255, 255, 255, 255 }
+			has_skin:bool = false
+			if .Chem in pr_types {
+				skin_color = { 100, 255, 100, 255 }
+			}
+			if .Breathe in pr_types {
+				br_rect := pr_params.rect
+				br_rect.y = 600
+				rl.ImageDraw(&pr_img, src_images[i_proto_idx], br_rect, { 0, 0, proto_tw, proto_th}, skin_color)
+				has_skin = true
+			}
+			
+			switch ent^.core.sub_type {
+				case "Simple":
+					if .Move in pr_types {
+						mv_rect := pr_params.rect
+						mv_rect.y = 400
+						rl.ImageDraw(&pr_img, src_images[i_proto_idx], mv_rect, { 0, 0, proto_tw, proto_th}, skin_color)
+						has_skin = true
+					}		
+				case "Complex":
+					proto_rot = ent^.vel.y + 180
+					proto_origin.x += proto_tw / 4
+					if .Move in pr_types {
+						//if step %% 4 == 0 {
+							//p_val := ent^.num_vars["t_step"]
+							//for ent^.num_vars["t_step"] == p_val {
+							//	ent^.num_vars["t_step"] = 100 * mth.floor(rand.float32() * 6)
+							//}
+						//}
+						//tail_off_x:f32 = 0
+						//tail_off_y:f32 =  ent^.num_vars["t_step"]
+						//rl.ImageDraw(&pr_img, src_images[i_proto_parts_idx], { tail_off_x, tail_off_y, 300, 100}, { proto_tw * 0.89, proto_th * 0.25, proto_tw, proto_th / 2}, skin_color)
+						t_color:rl.Color = { 204, 204, 204, 255 }
+						t_ow:f32 = f32(proto_tw) * 5
+						t_oh:f32 = f32(proto_th / 2) * 4
+						t_img := rl.GenImageColor(i32(t_ow), i32(t_oh), { 255, 255, 255, 0 })
+						ts_pt:rl.Vector2 = { 0, proto_th * 0.25 } 
+						t_pt:rl.Vector2 = { 0, proto_th }
+						t_dir:f32 = step %% 2 == 0 ? -1 : 1
+						t_max:int = 4
+						if .MoveS2 in pr_types {
+							t_max = 5
+						} else if .MoveS3 in pr_types {
+							t_max = 7
+						}
+						for i in 0..<t_max {
+							t_pt2:rl.Vector2 = t_pt
+							t_dx:f32 = t_ow * (0.05 + (rand.float32() * 0.05))
+							t_pt2.x += t_dx
+							if i == 0 {
+								t_pt2.y += (t_dir * (rand.float32() * 0.2) * t_oh)
+							} else {
+								t_pt2.y += (t_dir * (rand.float32() * 0.4) * t_oh)
+							}
+							t_dir *= -1
+							rl.ImageDrawLineEx(&t_img, t_pt, t_pt2, 6, t_color)
+							t_pt = t_pt2
+						}
+						rl.ImageDraw(&pr_img, t_img, { 0, 0, t_ow, t_oh }, { proto_tw * 0.89, proto_th * 0.25, proto_tw, proto_th / 2}, skin_color)
+						rl.UnloadImage(t_img)
+					}
+			}	
+
+			textures[t_proto_draw_idx] = rl.LoadTextureFromImage(pr_img)
+			rl.UnloadImage(pr_img)		
+			
+			rl.GenTextureMipmaps(&textures[t_proto_draw_idx])
+			rl.SetTextureFilter(textures[t_proto_draw_idx], main_filter)
+			rl.DrawTexturePro(textures[t_proto_draw_idx], { 0, 0, proto_tw * 2, proto_th }, {ent.pos.x, ent.pos.y, proto_tw * 2, proto_th }, proto_origin, proto_rot, pr_params.color)
+		case .Struck:
+			stk_params := item_draw_params(ent)
+			if ent^.decay <= 10 {
+				stk_params.color[3] = u8(f32(stk_params.color[3]) * (f32(ent^.decay) / 10))
+			}
+			stk_rot := ent.dir
+			struck_th:f32 = mth.floor(screen_height * 0.028)
+			struck_tw:f32 = (stk_params.rect.width / stk_params.rect.height) * struck_th
+			rl.DrawTexturePro(textures[t_struck_idx], stk_params.rect, {ent.pos.x, ent.pos.y, struck_tw, struck_th }, {struck_tw / 2, struck_th / 2}, stk_rot, stk_params.color)
+	}
+}
+
+draw_player :: proc() {
+	if active_player >= 0 {
+		c_color:rl.Color = { 100, 210, 210, 150 }
+		pos_1:rl.Vector2 = players[active_player].pos
+		reach := players[active_player].reach
+		dir := players[active_player].dir + 270
+
+		t_rad:f32 = player_tool_rad
+		if players[active_player].tool == .Pulse {
+			t_rad /= 2
+		}
+
+		pos_1_s := pos_1
+		pos_1_e := pos_1_s
+		pos_1_e.x += (reach * 0.5) * mth.cos(dir * mth.π / 180)
+		pos_1_e.y += (reach * 0.5) * mth.sin(dir * mth.π / 180)
+		rl.DrawLineEx(pos_1_s, pos_1_e, 5, c_color)
+
+		pos_2_s := pos_1_e
+		pos_2_e := pos_2_s
+		pos_2_e.x += ((reach * 0.5) - (t_rad * 2)) * mth.cos(dir * mth.π / 180)
+		pos_2_e.y += ((reach * 0.5) - (t_rad * 2)) * mth.sin(dir * mth.π / 180)
+		rl.DrawLineEx(pos_2_s, pos_2_e, 3, c_color)
+
+		switch players[active_player].tool {
+			case .None:
+				pos_3 := pos_1
+				pos_3.x += (reach - t_rad) * mth.cos(dir * mth.π / 180)
+				pos_3.y += (reach - t_rad) * mth.sin(dir * mth.π / 180)
+				for i in 0..<8 {
+					rl.DrawCircleLinesV(pos_3, t_rad - (f32(i) / 4), c_color)
+				}
+			case .Brane:
+
+			case .Pulse:
+				pos_3 := pos_1
+				pos_3.x += (reach - t_rad) * mth.cos(dir * mth.π / 180)
+				pos_3.y += (reach - t_rad) * mth.sin(dir * mth.π / 180)
+				rl.DrawCircleV(pos_3, t_rad, c_color)
+			case .Grab:
+		}
+
+		font_size:i32 = 16
+		player_text := strings.concatenate({"s-branes: ", int_to_str(players[active_player].brane_count)})
+		text_w := i32(rl.MeasureTextEx(font, strings.clone_to_cstring(player_text), f32(font_size), 0).x)
+		img_w:i32 = 20
+		padding:i32 = 10
+
+		bar_w:i32 = img_w + text_w + padding
+		bar_h:i32 = i32(f32(font_size) / 2)
+		p_det_w:i32 = (padding * 2) + bar_w
+		p_det_h1:i32 = img_w + (padding * 2)
+		p_det_h:i32 = p_det_h1 + bar_h + padding
+
+		p_det := rl.GenImageColor(i32(p_det_w), i32(p_det_h), {255,255,255,0})
+
+		round_r:i32 = 5
+		p_det_bg:rl.Color = { 255, 255, 255, 150 }
+		rl.ImageDrawCircle(&p_det, round_r, round_r, round_r, p_det_bg)
+		rl.ImageDrawCircle(&p_det, p_det_w - round_r, round_r, round_r, p_det_bg)
+		rl.ImageDrawCircle(&p_det, p_det_w - round_r, p_det_h - round_r, round_r, p_det_bg)
+		rl.ImageDrawCircle(&p_det, round_r, p_det_h - round_r, round_r, p_det_bg)
+		rl.ImageDrawRectangle(&p_det, round_r, 0, p_det_w - (2 * round_r), p_det_h,  p_det_bg)
+		rl.ImageDrawRectangle(&p_det, 0, round_r, p_det_w, p_det_h - (2 * round_r), p_det_bg)
+
+		b_offset_x:f32 = 0
+		b_offset_y:f32 = 0
+		b_color:rl.Color = { 0, 230, 230, 255}
+		b_ow:f32 = 200
+		b_oh:f32 = 200
+		b_rec:rl.Rectangle = {b_offset_x, b_offset_y, b_ow, b_oh}
+		b_tw:f32 = f32(img_w)
+		b_th:f32 = f32(img_w)
+
+		img_x:f32 = f32(padding)
+		img_y:f32 = f32(p_det_h1 / 2) - f32(img_w / 2)
+		rl.ImageDraw(&p_det, src_images[i_struck_idx], b_rec, { img_x, img_y, b_tw, b_th }, b_color)
+
+		txt_x:f32 = f32((padding * 2) + img_w)
+		txt_y:f32 = f32(p_det_h1 / 2) - (f32(font_size) / 2)
+		rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(player_text), { txt_x, txt_y }, f32(font_size), 0, { 30, 30, 30, 255 })
+
+		bar_x:f32 = f32(padding)
+		bar_y:f32 = f32(p_det_h1)
+		rl.ImageDrawRectangleLines(&p_det, {bar_x, bar_y, f32(bar_w), f32(bar_h)}, 1, { 120, 120, 120, 200 })
+		bar_per:f32 = f32(bar_w) * players[active_player].brane_percent
+		rl.ImageDrawRectangleRec(&p_det, {bar_x + 1, bar_y + 1, f32(bar_per - 2), f32(bar_h - 2)}, { 80, 220, 220, 200 })
+
+		textures[t_player_idx] = rl.LoadTextureFromImage(p_det)
+		rl.GenTextureMipmaps(&textures[t_player_idx])
+		rl.SetTextureFilter(textures[t_player_idx], main_filter)
+
+		p_det_x:f32 = 20
+		p_det_y:f32 = active_height - 20 - f32(p_det_h)
+
+		rl.DrawTextureRec(textures[t_player_idx], {0, 0, f32(p_det_w), f32(p_det_h)}, { p_det_x, p_det_y }, { 255, 255, 255, 200})
 	}
 }
 
@@ -114,84 +316,22 @@ draw_info :: proc() {
 		text_color:rl.Color = { 30, 30, 30, 200 }
 
 		padding:i32 = 10
-
-		info_w:i32 = 200
-		info_h:i32 = 200 + (2 * padding)
-		info_offset:f32 = 20
-
-		info := rl.GenImageColor(info_w, info_h, {255,255,255,0})
-
-		round_r:i32 = 5
-		info_bg:rl.Color = { 255, 255, 255, 100 }
-		rl.ImageDrawCircle(&info, round_r, round_r, round_r, info_bg)
-		rl.ImageDrawCircle(&info, info_w - round_r, round_r, round_r, info_bg)
-		rl.ImageDrawCircle(&info, info_w - round_r, info_h - round_r, round_r, info_bg)
-		rl.ImageDrawCircle(&info, round_r, info_h - round_r, round_r, info_bg)
-		rl.ImageDrawRectangle(&info, round_r, 0, info_w - (2 * round_r), info_h,  info_bg)
-		rl.ImageDrawRectangle(&info, 0, round_r, info_w, info_h - (2 * round_r), info_bg)
-		switch info_type {
-			case .None:
-			case .Chem:
-			case .Ort:
-				info_params.color[3] = 255
-
-				ort_thw:f32 = 80
-
-				t_x:f32 = (f32(info_w) / 2) - (ort_thw / 2)
-				t_y:f32 = f32(padding)
-				rl.ImageDraw(&info, src_images[i_ort_idx], info_params.rect, {t_x, t_y, ort_thw, ort_thw}, info_params.color)
-			case .Snip:
-				info_params.color[3] = 255
-
-				snip_th:f32 = 80
-				snip_tw:f32 = (info_params.rect.width / info_params.rect.height) * snip_th
-
-				t_x:f32 = (f32(info_w) / 2) - (snip_tw / 2)
-				t_y:f32 = f32(padding)
-
-				rl.ImageDraw(&info, src_images[i_snip_idx], info_params.rect, {t_x, t_y, snip_tw, snip_th }, info_params.color)
-			case .Strand:
-				info_params.color[3] = 255
-
-				strand_th:f32 = 80
-				strand_tw:f32 = (info_params.rect.width / info_params.rect.height) * strand_th
-
-				t_x:f32 = (f32(info_w) / 2) - (strand_tw / 2)
-				t_y:f32 = f32(padding)
-
-				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
-			case .Proto:
-			case .Struck:
-				info_params.color[3] = 255
-
-				struck_th:f32 = 80
-				struck_tw:f32 = (info_params.rect.width / info_params.rect.height) * struck_th
-
-				t_x:f32 = (f32(info_w) / 2) - (struck_tw / 2)
-				t_y:f32 = f32(padding)
-
-				rl.ImageDraw(&info, src_images[i_struck_idx], info_params.rect, {t_x, t_y, struck_tw, struck_th }, info_params.color)
-		}
-
+		line_spacing:f32 = 5
+		line_height:f32 = f32(font_size) + line_spacing
 
 		i_buff:string = ""
-		y_off:f32 = 100
+		text_height:f32 = f32(padding)
+		lines := make([dynamic]string)
 		
 		disp_id:string = info_id
-		i_buff = strings.concatenate({"Item ID: ", disp_id})
-		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
+		append(&lines, strings.concatenate({"Item ID: ", disp_id}))
+		text_height += line_height
 
-		y_off += f32(font_size) + 3
+		append(&lines, strings.concatenate({"Type: ", type_name(info_type)}))
+		text_height += line_height
 
-		i_buff = strings.concatenate({"Type: ", type_name(info_type)})
-		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
-
-		y_off += f32(font_size) + 3
-
-		i_buff = strings.concatenate({"Class: ", class_name(info_type,info_sub_type)})
-		rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
-
-		y_off += f32(font_size) + 3
+		append(&lines, strings.concatenate({"Class: ", class_name(info_type,info_sub_type)}))
+		text_height += line_height
 
 		switch info_type {
 			case .None:
@@ -199,14 +339,12 @@ draw_info :: proc() {
 			case .Ort:
 			case .Snip:
 				if !(info_sub_type == "ex" || info_sub_type == "block") {
-					i_buff = strings.concatenate({"Code: ", info_data})
-					rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
-					y_off += f32(font_size) + 3
+					append(&lines, strings.concatenate({"Code: ", info_data}))
+					text_height += line_height
 				}
 			case .Strand:
-				i_buff = "Code: "
-				rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
-				y_off += f32(font_size) + 3
+				append(&lines, "Code: ")
+				text_height += line_height
 
 				code_parts := make([dynamic]string)
 				code := info_data
@@ -225,9 +363,8 @@ draw_info :: proc() {
 				}
 
 				for c := 0; c < len(code_parts); c += 1 {
-					i_buff = code_parts[c]
-					rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(i_buff), { f32(padding), y_off }, f32(font_size), 0, text_color)
-					y_off += f32(font_size)
+					append(&lines, code_parts[c])
+					text_height += line_height
 				}
 
 				delete(code_parts)
@@ -235,11 +372,78 @@ draw_info :: proc() {
 			case .Struck:
 		}
 
-		filter := rl.TextureFilter.BILINEAR
+		img_height:f32 = 80
+
+		info_w:i32 = 200
+		info_h:i32 = i32(text_height + img_height) + (2 * padding)
+		info_offset:f32 = 20
+
+		info := rl.GenImageColor(info_w, info_h, {255,255,255,0})
+
+		round_r:i32 = 5
+		info_bg:rl.Color = { 255, 255, 255, 100 }
+		rl.ImageDrawCircle(&info, round_r, round_r, round_r, info_bg)
+		rl.ImageDrawCircle(&info, info_w - round_r, round_r, round_r, info_bg)
+		rl.ImageDrawCircle(&info, info_w - round_r, info_h - round_r, round_r, info_bg)
+		rl.ImageDrawCircle(&info, round_r, info_h - round_r, round_r, info_bg)
+		rl.ImageDrawRectangle(&info, round_r, 0, info_w - (2 * round_r), info_h,  info_bg)
+		rl.ImageDrawRectangle(&info, 0, round_r, info_w, info_h - (2 * round_r), info_bg)
+		switch info_type {
+			case .None:
+			case .Chem:
+			case .Ort:
+				info_params.color[3] = 255
+
+				ort_thw:f32 = img_height
+
+				t_x:f32 = (f32(info_w) / 2) - (ort_thw / 2)
+				t_y:f32 = f32(padding)
+				rl.ImageDraw(&info, src_images[i_ort_idx], info_params.rect, {t_x, t_y, ort_thw, ort_thw}, info_params.color)
+			case .Snip:
+				info_params.color[3] = 255
+
+				snip_th:f32 = img_height
+				snip_tw:f32 = (info_params.rect.width / info_params.rect.height) * snip_th
+
+				t_x:f32 = (f32(info_w) / 2) - (snip_tw / 2)
+				t_y:f32 = f32(padding)
+
+				rl.ImageDraw(&info, src_images[i_snip_idx], info_params.rect, {t_x, t_y, snip_tw, snip_th }, info_params.color)
+			case .Strand:
+				info_params.color[3] = 255
+
+				strand_th:f32 = img_height
+				strand_tw:f32 = (info_params.rect.width / info_params.rect.height) * strand_th
+
+				t_x:f32 = (f32(info_w) / 2) - (strand_tw / 2)
+				t_y:f32 = f32(padding)
+
+				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
+			case .Proto:
+			case .Struck:
+				info_params.color[3] = 255
+
+				struck_th:f32 = img_height
+				struck_tw:f32 = (info_params.rect.width / info_params.rect.height) * struck_th
+
+				t_x:f32 = (f32(info_w) / 2) - (struck_tw / 2)
+				t_y:f32 = f32(padding)
+
+				rl.ImageDraw(&info, src_images[i_struck_idx], info_params.rect, {t_x, t_y, struck_tw, struck_th }, info_params.color)
+		}
+
+		y_off:f32 = f32(2 * padding) + img_height
+
+		for i in 0..<len(lines) {
+			rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(lines[i]), { f32(padding), y_off }, f32(font_size), 0, text_color)
+			y_off += line_height
+		}
+
+		delete(lines)
 
 		textures[t_info_idx] = rl.LoadTextureFromImage(info)
 		rl.GenTextureMipmaps(&textures[t_info_idx])
-		rl.SetTextureFilter(textures[t_info_idx], filter)
+		rl.SetTextureFilter(textures[t_info_idx], main_filter)
 
 		info_a:f32 = 200
 		if info_item_timer < 10 && info_item_timer >= 0 {
@@ -321,62 +525,17 @@ draw_environment :: proc() {
 		hud_pos.y = mouse_pos.y + hud_offset
 	}
 
-	filter := rl.TextureFilter.BILINEAR
-
 	textures[t_env_idx] = rl.LoadTextureFromImage(hud)
 	rl.GenTextureMipmaps(&textures[t_env_idx])
-	rl.SetTextureFilter(textures[t_env_idx], filter)
+	rl.SetTextureFilter(textures[t_env_idx], main_filter)
 
 	rl.DrawTextureRec(textures[t_env_idx], {0, 0, f32(hud_w), f32(hud_h)}, hud_pos, rl.WHITE)
-}
-
-draw_entity :: proc(ent:^Entity) {
-	switch ent.core.e_type {
-		case .None:
-		case .Chem:
-		case .Ort:
-			o_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent^.decay) / 10))
-			}
-			ort_thw:f32 = mth.floor(screen_height * 0.013)
-			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {ent.pos.x, ent.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, ent.vel.y, o_params.color)
-		case .Snip:
-			sn_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent^.decay) / 10))
-			}
-			snip_th:f32 = mth.floor(screen_height * 0.015)
-			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
-			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {ent.pos.x, ent.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, ent.vel.y, sn_params.color)
-		case .Strand:
-			st_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent^.decay) / 10))
-			}
-			strand_th:f32 = mth.floor(screen_height * 0.017)
-			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
-			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
-		case .Proto:
-		case .Struck:
-			stk_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				stk_params.color[3] = u8(f32(stk_params.color[3]) * (f32(ent^.decay) / 10))
-			}
-			stk_rot := ent.vel.y
-			if ent^.core.sub_type == "brane" || ent^.core.sub_type == "husk" {
-				stk_rot = 0
-			}
-			struck_th:f32 = mth.floor(screen_height * 0.028)
-			struck_tw:f32 = (stk_params.rect.width / stk_params.rect.height) * struck_th
-			rl.DrawTexturePro(textures[t_struck_idx], stk_params.rect, {ent.pos.x, ent.pos.y, struck_tw, struck_th }, {struck_tw / 2, struck_th / 2}, stk_rot, stk_params.color)
-	}
 }
 
 init_graphics :: proc() {
 
 	font = rl.LoadFont("./nina.ttf")
-	filter := rl.TextureFilter.BILINEAR
+	main_filter = rl.TextureFilter.BILINEAR
 
 	t_idx := 0
 	i_idx := 0
@@ -388,7 +547,7 @@ init_graphics :: proc() {
 	bg_img := rl.GenImageGradientRadial(i32(active_width * 2), i32(active_height * 2), 0.2, bg_c1, bg_c2)
 	bg := rl.LoadTextureFromImage(bg_img)
 	rl.GenTextureMipmaps(&bg)
-	rl.SetTextureFilter(bg, filter)
+	rl.SetTextureFilter(bg, main_filter)
 	rl.UnloadImage(bg_img)
 	textures[t_idx] = bg
 	t_bg_idx = t_idx
@@ -398,16 +557,30 @@ init_graphics :: proc() {
 
 	env := rl.LoadTextureFromImage(x_img)
 	rl.GenTextureMipmaps(&env)
-	rl.SetTextureFilter(env, filter)
+	rl.SetTextureFilter(env, main_filter)
 	textures[t_idx] = env
 	t_env_idx = t_idx
 	t_idx += 1
 
 	info := rl.LoadTextureFromImage(x_img)
 	rl.GenTextureMipmaps(&info)
-	rl.SetTextureFilter(info, filter)
+	rl.SetTextureFilter(info, main_filter)
 	textures[t_idx] = info
 	t_info_idx = t_idx
+	t_idx += 1
+
+	player := rl.LoadTextureFromImage(x_img)
+	rl.GenTextureMipmaps(&player)
+	rl.SetTextureFilter(player, main_filter)
+	textures[t_idx] = info
+	t_player_idx = t_idx
+	t_idx += 1
+
+	proto_draw := rl.LoadTextureFromImage(x_img)
+	rl.GenTextureMipmaps(&proto_draw)
+	rl.SetTextureFilter(proto_draw, main_filter)
+	textures[t_idx] = proto_draw
+	t_proto_draw_idx = t_idx
 	t_idx += 1
 
 	rl.UnloadImage(x_img)
@@ -421,7 +594,7 @@ init_graphics :: proc() {
 	img_loader = []u8{}
 	orts := rl.LoadTextureFromImage(orts_img)
 	rl.GenTextureMipmaps(&orts)
-	rl.SetTextureFilter(orts, filter)
+	rl.SetTextureFilter(orts, main_filter)
 	textures[t_idx] = orts
 	src_images[i_idx] = orts_img
 	t_ort_idx = t_idx
@@ -436,7 +609,7 @@ init_graphics :: proc() {
 	img_loader = []u8{}
 	snips := rl.LoadTextureFromImage(snips_img)
 	rl.GenTextureMipmaps(&snips)
-	rl.SetTextureFilter(snips, filter)
+	rl.SetTextureFilter(snips, main_filter)
 	textures[t_idx] = snips
 	src_images[i_idx] = snips_img
 	t_snip_idx = t_idx
@@ -450,12 +623,40 @@ init_graphics :: proc() {
 	img_loader = []u8{}
 	strands := rl.LoadTextureFromImage(strands_img)
 	rl.GenTextureMipmaps(&strands)
-	rl.SetTextureFilter(strands, filter)
+	rl.SetTextureFilter(strands, main_filter)
 	textures[t_idx] = strands
 	src_images[i_idx] = strands_img
 	t_strand_idx = t_idx
 	t_idx += 1
 	i_strand_idx = i_idx
+	i_idx += 1
+
+	img_loader = #load("./images/protos.png")
+	data_size = i32(len(img_loader))
+	protos_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
+	protos := rl.LoadTextureFromImage(protos_img)
+	rl.GenTextureMipmaps(&protos)
+	rl.SetTextureFilter(protos, main_filter)
+	textures[t_idx] = protos
+	src_images[i_idx] = protos_img
+	t_proto_idx = t_idx
+	t_idx += 1
+	i_proto_idx = i_idx
+	i_idx += 1
+
+	img_loader = #load("./images/proto_parts.png")
+	data_size = i32(len(img_loader))
+	proto_parts_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
+	proto_parts := rl.LoadTextureFromImage(proto_parts_img)
+	rl.GenTextureMipmaps(&proto_parts)
+	rl.SetTextureFilter(proto_parts, main_filter)
+	textures[t_idx] = proto_parts
+	src_images[i_idx] = proto_parts_img
+	t_proto_parts_idx = t_idx
+	t_idx += 1
+	i_proto_parts_idx = i_idx
 	i_idx += 1
 
 	img_loader = #load("./images/strucks.png")
@@ -464,7 +665,7 @@ init_graphics :: proc() {
 	img_loader = []u8{}
 	strucks := rl.LoadTextureFromImage(strucks_img)
 	rl.GenTextureMipmaps(&strucks)
-	rl.SetTextureFilter(strucks, filter)
+	rl.SetTextureFilter(strucks, main_filter)
 	textures[t_idx] = strucks
 	src_images[i_idx] = strucks_img
 	t_struck_idx = t_idx
@@ -593,6 +794,23 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			
 			ret_rec = {offset_x, offset_y, strand_ow, strand_oh}
 		case .Proto:
+			offset_x:f32 = 0
+			offset_y:f32 = 0
+			pr_alpha:u8 = 160
+			ret_color = { 102, 102, 102, pr_alpha}
+
+			switch ent^.core.sub_type {
+				case "Simple":
+					offset_x = 300
+					ret_color = { 80, 255, 80, pr_alpha}
+				case "Complex":
+					ret_color = { 20, 255, 255, pr_alpha}
+			}
+
+			proto_ow:f32 = 300
+			proto_oh:f32 = 200
+			
+			ret_rec = {offset_x, offset_y, proto_ow, proto_oh}
 		case .Struck:
 			offset_x:f32 = 0
 			offset_y:f32 = 0
