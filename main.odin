@@ -10,16 +10,105 @@ import "core:math/rand"
 screen_width:f32 = 1280
 screen_height: f32 = 720
 
+active_width:f32 = screen_width
+active_height:f32 = screen_height
+
 frame_rate:f32 = 400
 delta:f32 = 0
 
-main :: proc() {
+mouse_button_state := []int{0,0}
+mouse_button_timer := []int{0,0}
 
+main :: proc() {
+	rl.SetTraceLogLevel(rl.TraceLogLevel.NONE)
 	rl.SetConfigFlags({ .VSYNC_HINT })
 	rl.InitWindow(i32(screen_width), i32(screen_height), "VLF")
 	rl.SetTargetFPS(500)
+	defer rl.CloseWindow()
+
+	vlf_init()
+	defer vlf_end()
 
     for !rl.WindowShouldClose() {
+		if mouse_button_timer[0] > 0 {
+			mouse_button_timer[0] -= 1
+		}
+		if mouse_button_timer[1] > 0 {
+			mouse_button_timer[1] -= 1
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT_CONTROL) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_CONTROL) {
+			set_flags += { .Cntl }
+		} else {
+			set_flags -= { .Cntl }
+		}
+
+        if rl.IsKeyDown(rl.KeyboardKey.LEFT_SHIFT) || rl.IsKeyDown(rl.KeyboardKey.RIGHT_SHIFT) {
+			set_flags += { .Shift }
+		} else {
+			set_flags -= { .Shift }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.LEFT) || rl.IsKeyDown(rl.KeyboardKey.A) {
+			set_flags += { .Left }
+		} else {
+			set_flags -= { .Left }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.RIGHT) || rl.IsKeyDown(rl.KeyboardKey.D) {
+			set_flags += { .Right }
+		} else {
+			set_flags -= { .Right }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.UP) || rl.IsKeyDown(rl.KeyboardKey.W) {
+			set_flags += { .Up }
+		} else {
+			set_flags -= { .Up }
+		}
+
+		if rl.IsKeyDown(rl.KeyboardKey.DOWN) || rl.IsKeyDown(rl.KeyboardKey.R) {
+			set_flags += { .Down }
+		} else {
+			set_flags -= { .Down }
+		}
+
+		key := rl.GetCharPressed()
+
+		// Check if more characters have been pressed on the same frame
+		for key > 0 {
+			if key == 32 {
+				inject_at(&events, 0, Event{
+					e_type = .ShootPress,
+					flags = set_flags + {},
+					pos = mouse_pos
+				})
+			}
+
+			key = rl.GetCharPressed()  // Check next character in the queue
+		}
+
+
+		mouse_pos = rl.GetMousePosition()
+
+		if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			inject_at(&events, 0, Event{
+				e_type = .Click,
+				flags = set_flags + {},
+				pos = mouse_pos
+			})
+		
+			if mouse_button_timer[0] > 0 {
+				inject_at(&events, 0, Event{
+					e_type = .DoubleClick,
+					flags = set_flags + {},
+					pos = mouse_pos
+				})
+			}
+
+			mouse_button_timer[0] = 16
+		}
+
 		delta += rl.GetFrameTime()
 		runStep := false
 
@@ -30,6 +119,9 @@ main :: proc() {
 		
 		if (runStep) {
 			// run game step
+			if runStep {
+				vlf_run()
+			}
 		}
 
 		{
@@ -37,11 +129,11 @@ main :: proc() {
 			rl.ClearBackground(rl.BLACK)
 
 			// draw game step
+			vlf_draw()
 
 			rl.EndDrawing()
 		}
 	}
-	rl.CloseWindow()
 
 }
 
