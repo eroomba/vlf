@@ -67,7 +67,7 @@ add_player :: proc(name:string, num:int, color:rl.Color, pos:rl.Vector2, status:
     p_counts["struck"] = 0
     p_counts["xtra"] = 0
     n_vars := make(map[string]f32)
-    n_vars["brane_timer"] = 0
+    n_vars["tool_timer"] = 0
 
     append(&players, Player{
         status = status,
@@ -98,8 +98,8 @@ run_player :: proc(player:^Player) {
             player^.brane_percent += 0.005
         }
 
-        if player^.num_vars["brane_timer"] > 0 {
-            player^.num_vars["brane_timer"] -= 1
+        if player^.num_vars["tool_timer"] > 0 {
+            player^.num_vars["tool_timer"] -= 1
         }
     }
 
@@ -118,7 +118,7 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                 case .None:
                 case .Brane:
 
-                    if player^.brane_count > 0 && player^.num_vars["brane_timer"] == 0 {
+                    if player^.brane_count > 0 && player^.num_vars["tool_timer"] == 0 {
                         br_id := build_id(.Struck)
                         br_key:string = "struck.brane"
 
@@ -150,45 +150,50 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                             owner = player^.num
                         })
 
-                        player^.num_vars["brane_timer"] = 36
+                        player^.num_vars["tool_timer"] = 36
                         player^.brane_count -= 1
 
                     }
     
                 case .Pulse:
-                    n_vars := make(map[string]f32)
-                    n_vars["step"] = 0
-                    n_vars["power"] = mth.ceil(active_height * 0.008)
+                    if player^.num_vars["tool_timer"] == 0 {
+                        n_vars := make(map[string]f32)
+                        n_vars["step"] = 0
+                        n_vars["power"] = mth.ceil(active_height * 0.008)
 
-                    p_dist := player^.reach
+                        p_dist := player^.reach
 
-                    p_dir := player^.dir + 270
-                    p_pos := player^.pos
-                    p_pos.x += p_dist * mth.cos(p_dir * mth.π / 180)
-                    p_pos.y += p_dist * mth.sin(p_dir * mth.π / 180)
+                        p_dir := player^.dir + 270
+                        p_pos := player^.pos
+                        p_pos.x += p_dist * mth.cos(p_dir * mth.π / 180)
+                        p_pos.y += p_dist * mth.sin(p_dir * mth.π / 180)
 
-                    append(&items, Item{
-                        id = strings.concatenate({"p-", int_to_str(player^.num),"-shoot-", int_to_str(step)}),
-                        i_type = .Pulse,
-                        status = .Active,
-                        pos = p_pos,
-                        vel = { 0, 0 },
-                        num_vars = n_vars,
-                        str_vars = make(map[string]string),
-                        owner = player^.num
-                    })
+                        append(&items, Item{
+                            id = strings.concatenate({"p-", int_to_str(player^.num),"-shoot-", int_to_str(step)}),
+                            i_type = .Pulse,
+                            status = .Active,
+                            pos = p_pos,
+                            vel = { 0, 0 },
+                            num_vars = n_vars,
+                            str_vars = make(map[string]string),
+                            owner = player^.num
+                        })
+
+                        player^.num_vars["tool_timer"] = 3
+                    }
                 case .Grab:
+                    if player^.num_vars["tool_timer"] == 0 {}
             }
         case .Toggle:
             switch player^.tool {
                 case .None:
                     player^.tool = .Brane
                 case .Brane:
-                    player^.tool = .Pulse
-                case .Pulse:
                     player^.tool = .Grab
-                case .Grab:
+                case .Pulse:
                     player^.tool = .Brane
+                case .Grab:
+                    player^.tool = .Pulse
             }
     }
 }
