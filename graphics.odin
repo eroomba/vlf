@@ -13,7 +13,7 @@ Graphics_Params :: struct {
 }
 
 src_images:[9]rl.Image
-textures:[11]rl.Texture2D
+textures:[12]rl.Texture2D
 font:rl.Font
 main_filter:rl.TextureFilter
 
@@ -29,6 +29,7 @@ t_proto_parts_idx := -1
 t_proto_draw_idx := -1
 t_struck_idx := -1
 t_item_idx := -1
+t_tool_idx := -1
 
 i_ort_idx := -1
 i_snip_idx := -1
@@ -61,22 +62,6 @@ vlf_draw :: proc() {
 	}
 
 	draw_player()
-}
-
-draw_item :: proc(item:^Item) {
-	if item^.status == .Active {
-		switch item^.i_type {
-			case .None:
-			case .Pulse:
-				step := item^.num_vars["step"]
-				p_pos := item^.pos
-
-				p_rad:f32 = player_tool_rad + f32(step * 5)
-				//p_alpha := u8(240 * (1 - (step / 5))) 
-				p_alpha:u8 = u8(240 - (((8 - u8(step)) / 8) * 200))
-				rl.DrawCircleLinesV(p_pos, p_rad, {180, 180, 255, p_alpha})
-		}
-	}
 }
 
 draw_entity :: proc(ent:^Entity) {
@@ -205,45 +190,67 @@ draw_entity :: proc(ent:^Entity) {
 
 draw_player :: proc() {
 	if active_player >= 0 {
-		c_color:rl.Color = { 100, 210, 210, 150 }
+
+		c_color:rl.Color = { 100, 210, 210, 255 }
 		pos_1:rl.Vector2 = players[active_player].pos
 		reach := players[active_player].reach
 		dir := players[active_player].dir + 270
 
 		t_rad:f32 = player_tool_rad
-		if players[active_player].tool == .Pulse {
-			t_rad /= 2
-		}
+		t_rad2:f32 = t_rad * 2
+		t_pad:f32 = mth.ceil(active_height * 0.01)
+		t_pad2:f32 = t_pad * 2
+		t_w:f32 = mth.ceil(active_height * 0.01)
 
-		pos_1_s := pos_1
-		pos_1_e := pos_1_s
-		pos_1_e.x += (reach * 0.5) * mth.cos(dir * mth.π / 180)
-		pos_1_e.y += (reach * 0.5) * mth.sin(dir * mth.π / 180)
-		rl.DrawLineEx(pos_1_s, pos_1_e, 5, c_color)
+		tool_w:f32 = t_rad2 * 2
+		tool_h:f32 = (2 * reach) + (t_rad2) + t_pad2
+		tool_img := rl.GenImageColor(i32(tool_w), i32(tool_h), { 255, 255, 255, 0 })
 
-		pos_2_s := pos_1_e
-		pos_2_e := pos_2_s
-		pos_2_e.x += ((reach * 0.5) - (t_rad * 2)) * mth.cos(dir * mth.π / 180)
-		pos_2_e.y += ((reach * 0.5) - (t_rad * 2)) * mth.sin(dir * mth.π / 180)
-		rl.DrawLineEx(pos_2_s, pos_2_e, 3, c_color)
+		rl.ImageDrawLineEx(&tool_img, {tool_w * 0.5, tool_h}, {tool_w * 0.5, tool_h * 0.5}, i32(t_w * 2), c_color)
+		rl.ImageDrawLineEx(&tool_img, {tool_w * 0.5, tool_h * 0.5}, {tool_w * 0.5, t_rad2 * 2 }, i32(t_w), c_color)
 
 		switch players[active_player].tool {
 			case .None:
-				pos_3 := pos_1
-				pos_3.x += (reach - t_rad) * mth.cos(dir * mth.π / 180)
-				pos_3.y += (reach - t_rad) * mth.sin(dir * mth.π / 180)
-				for i in 0..<8 {
-					rl.DrawCircleLinesV(pos_3, t_rad - (f32(i) / 4), c_color)
-				}
-			case .Brane:
 
+			case .Brane:
+				rl.ImageDrawCircleV(&tool_img,{ tool_w * 0.5, t_rad2 }, i32(t_rad2), c_color)
+				rl.ImageDrawCircleV(&tool_img,{ tool_w * 0.5, t_rad2 }, i32(t_rad2 - t_w), { 255, 255, 255, 0 })
+				rl.ImageDrawRectangleRec(&tool_img, { 0, f32(t_rad2), f32(t_rad2 - (t_w * 0.5)), f32(t_rad2) }, { 255, 255, 255, 0 })
+				if players[active_player].brane_count > 0 {
+					br_tr:u8 = 100
+					br_dec:int = int(players[active_player].num_vars["brane_timer"] * 10)
+					if br_dec > 100 {
+						br_tr = 0
+					} else if br_dec <= 100 {
+						br_tr -= u8(br_dec)
+					}
+
+					br_rec:rl.Rectangle = { 0, 0, 200, 200 } 
+					br_color:rl.Color = { 0, 230, 230, br_tr }
+
+					br_th:f32 = mth.floor(screen_height * 0.028)
+					br_tw:f32 = (br_rec.width / br_rec.height) * br_th
+					br_tw *= 2
+					br_th *= 2
+			
+					rl.ImageDraw(&tool_img, src_images[i_struck_idx], br_rec, {t_rad2 - (br_tw * 0.5), t_rad2 - (br_th * 0.5), br_tw, br_th}, br_color)
+				}
 			case .Pulse:
-				pos_3 := pos_1
-				pos_3.x += (reach - t_rad) * mth.cos(dir * mth.π / 180)
-				pos_3.y += (reach - t_rad) * mth.sin(dir * mth.π / 180)
-				rl.DrawCircleV(pos_3, t_rad, c_color)
+				p_rad:f32 = t_rad2 * 0.25
+				rl.ImageDrawLineEx(&tool_img, {tool_w * 0.5, t_rad2 * 2 }, {tool_w * 0.5, t_rad2 }, 6, c_color)
+				rl.ImageDrawCircleV(&tool_img,{tool_w * 0.5, t_rad2}, i32(p_rad), c_color)
 			case .Grab:
+				rl.ImageDrawCircleV(&tool_img,{ tool_w * 0.5, t_rad2 }, i32(t_rad2), c_color)
+				rl.ImageDrawRectangleRec(&tool_img, {0, 0, tool_w, t_rad2}, { 255, 255, 255, 0 })
 		}
+
+		rl.ImageDrawCircleV(&tool_img,{f32(tool_w * 0.5), f32(tool_h - t_pad2)}, i32(t_rad), c_color)
+
+		textures[t_tool_idx] = rl.LoadTextureFromImage(tool_img)
+		rl.UnloadImage(tool_img)
+		rl.GenTextureMipmaps(&textures[t_tool_idx])
+		rl.SetTextureFilter(textures[t_tool_idx], main_filter)
+		rl.DrawTexturePro(textures[t_tool_idx], {0, 0, tool_w, tool_h}, {players[active_player].pos.x, players[active_player].pos.y, tool_w * 0.5, tool_h * 0.5}, {tool_w * 0.25, (tool_h * 0.5) - t_pad}, players[active_player].dir, { 255, 255, 255, 180})
 
 		font_size:i32 = 16
 		player_text := strings.concatenate({"s-branes: ", int_to_str(players[active_player].brane_count)})
@@ -299,6 +306,22 @@ draw_player :: proc() {
 		p_det_y:f32 = active_height - 20 - f32(p_det_h)
 
 		rl.DrawTextureRec(textures[t_player_idx], {0, 0, f32(p_det_w), f32(p_det_h)}, { p_det_x, p_det_y }, { 255, 255, 255, 200})
+	}
+}
+
+draw_item :: proc(item:^Item) {
+	if item^.status == .Active {
+		switch item^.i_type {
+			case .None:
+			case .Pulse:
+				step := item^.num_vars["step"]
+				p_pos := item^.pos
+
+				p_rad:f32 = player_tool_rad + f32(step * 5)
+				//p_alpha := u8(240 * (1 - (step / 5))) 
+				p_alpha:u8 = u8(240 - (((8 - u8(step)) / 8) * 200))
+				rl.DrawCircleLinesV(p_pos, p_rad, {180, 180, 255, p_alpha})
+		}
 	}
 }
 
@@ -581,6 +604,13 @@ init_graphics :: proc() {
 	rl.SetTextureFilter(proto_draw, main_filter)
 	textures[t_idx] = proto_draw
 	t_proto_draw_idx = t_idx
+	t_idx += 1
+
+	tool_draw := rl.LoadTextureFromImage(x_img)
+	rl.GenTextureMipmaps(&tool_draw)
+	rl.SetTextureFilter(tool_draw, main_filter)
+	textures[t_idx] = tool_draw
+	t_tool_idx = t_idx
 	t_idx += 1
 
 	rl.UnloadImage(x_img)

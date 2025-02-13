@@ -36,21 +36,24 @@ Player :: struct {
     tool:Player_Tool,
     pos:rl.Vector2,
     reach:f32,
-    dir:f32
+    dir:f32,
+    num_vars:map[string]f32
 }
 
-player_keys := [3]rune {
-	rune(32), // SPACE
-	'Q', 
-	'E'
+player_keys := []rl.KeyboardKey {
+	rl.KeyboardKey.SPACE, // SPACE
+	rl.KeyboardKey.E, // E/e 
+	rl.KeyboardKey.Q  // Q
 }
 
 players := make([dynamic]Player)
-player_tool_rad:f32 = 8
+player_tool_rad:f32 = mth.ceil(0.02 * active_height)
 max_brane_count:int = 5
 active_player:int = -1
-player_dir_delta:f32 = 2
-player_reach_delta:f32 = 5
+min_reach:f32 = mth.ceil(0.05 * active_height)
+max_reach:f32 = mth.floor(active_height * 0.5)
+player_dir_delta:f32 = mth.ceil(0.002 * active_height)
+player_reach_delta:f32 = mth.ceil(0.005 * active_height)
 
 start :: proc() {
     add_player("System",0,{245,245,245,255}, { -100, -100 })
@@ -63,6 +66,8 @@ add_player :: proc(name:string, num:int, color:rl.Color, pos:rl.Vector2, status:
     p_counts["proto"] = 0
     p_counts["struck"] = 0
     p_counts["xtra"] = 0
+    n_vars := make(map[string]f32)
+    n_vars["brane_timer"] = 0
 
     append(&players, Player{
         status = status,
@@ -74,8 +79,9 @@ add_player :: proc(name:string, num:int, color:rl.Color, pos:rl.Vector2, status:
         counts = p_counts,
         tool = .Pulse,
         pos = pos,
-        reach = active_height / 4,
-        dir = 0
+        reach = active_height * 0.25,
+        dir = 0,
+        num_vars = n_vars
     })
     return len(players) - 1
 }
@@ -90,6 +96,10 @@ run_player :: proc(player:^Player) {
     if step %% 3 == 0 {
         if player^.brane_count < max_brane_count {
             player^.brane_percent += 0.005
+        }
+
+        if player^.num_vars["brane_timer"] > 0 {
+            player^.num_vars["brane_timer"] -= 1
         }
     }
 
@@ -107,12 +117,50 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
             switch player^.tool {
                 case .None:
                 case .Brane:
+
+                    if player^.brane_count > 0 && player^.num_vars["brane_timer"] == 0 {
+                        br_id := build_id(.Struck)
+                        br_key:string = "struck.brane"
+
+                        p_dist := player^.reach
+                        p_dir := player^.dir + 270
+                        br_pos := player^.pos
+                        br_pos.x += p_dist * mth.cos(p_dir * mth.π / 180)
+                        br_pos.y += p_dist * mth.sin(p_dir * mth.π / 180)
+
+                        br_vel:rl.Vector2 = { 0, p_dir }
+
+                        append(&entities, Entity{
+                            id = br_id,
+                            core = &entity_cores[br_key],
+                            pos = br_pos,
+                            vel = br_vel,
+                            dir = rand.float32() * 360,
+                            gen = step,
+                            age = 1,
+                            status = .Active,
+                            life = entity_cores[br_key].maxlife,
+                            maxlife = entity_cores[br_key].maxlife,
+                            decay = entity_cores[br_key].decay,
+                            complexity = 0,
+                            num_vars = make(map[string]f32),
+                            str_vars = make(map[string]string),
+                            data = "BRANE",
+                            parent = "",
+                            owner = player^.num
+                        })
+
+                        player^.num_vars["brane_timer"] = 36
+                        player^.brane_count -= 1
+
+                    }
+    
                 case .Pulse:
                     n_vars := make(map[string]f32)
                     n_vars["step"] = 0
-                    n_vars["power"] = 5
+                    n_vars["power"] = mth.ceil(active_height * 0.008)
 
-                    p_dist := player^.reach - player_tool_rad
+                    p_dist := player^.reach
 
                     p_dir := player^.dir + 270
                     p_pos := player^.pos
@@ -132,23 +180,35 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                 case .Grab:
             }
         case .Toggle:
+            switch player^.tool {
+                case .None:
+                    player^.tool = .Brane
+                case .Brane:
+                    player^.tool = .Pulse
+                case .Pulse:
+                    player^.tool = .Grab
+                case .Grab:
+                    player^.tool = .Brane
+            }
     }
 }
 
 player_update_reach :: proc(player:^Player, dir:f32) {
     players[active_player].reach += dir * player_reach_delta
-    if players[active_player].reach < 30 {
-        players[active_player].reach = 30
-    } else if players[active_player].reach > active_height / 2 {
-        players[active_player].reach = active_height / 2
+    if players[active_player].reach < min_reach {
+        players[active_player].reach = min_reach
+    } else if players[active_player].reach > max_reach {
+        players[active_player].reach = max_reach
     }
 }
 
 player_update_dir :: proc(player:^Player, dir:f32) {
+    min_dir:f32 = -85
+    max_dir:f32 = 85
     players[active_player].dir += dir * player_dir_delta
-    if players[active_player].dir < -85 {
-        players[active_player].dir = -85
-    } else if players[active_player].dir > 85 {
-        players[active_player].dir = 85
+    if players[active_player].dir < min_dir {
+        players[active_player].dir = min_dir
+    } else if players[active_player].dir > max_dir {
+        players[active_player].dir = max_dir
     }
 }

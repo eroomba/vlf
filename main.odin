@@ -73,10 +73,10 @@ main :: proc() {
 			set_flags -= { .Down }
 		}
 
-		key := rl.GetCharPressed()
+		key := rl.GetKeyPressed()
 
 		// Check if more characters have been pressed on the same frame
-		for key > 0 {
+		for key != rl.KeyboardKey.KEY_NULL {
 			if key == player_keys[0] {
 				inject_at(&events, 0, Event{
 					e_type = .PlayerAction1,
@@ -93,7 +93,7 @@ main :: proc() {
 				})
 			}
 
-			key = rl.GetCharPressed()  // Check next character in the queue
+			key = rl.GetKeyPressed()  // Check next character in the queue
 		}
 
 
