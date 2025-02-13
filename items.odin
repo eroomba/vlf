@@ -56,13 +56,13 @@ run_item :: proc(item:^Item) {
 
                 if step == 0 {
 
-                    h_range:f32 = active_width * 0.1
+                    h_range:f32 = active_width * 0.15
                     hits := hash_find_2(h_pos, h_range)
                     for hit in hits {
                         ang:f32 = mth.atan2(hit^.pos.y - h_pos.y, hit^.pos.x - h_pos.x) * 180 / mth.π
                         dist:f32 = rl.Vector2Distance(h_pos, hit^.pos)
                         power2:f32 = power * (1 - (dist / h_range))
-                        hit^.vel.x = power2
+                        hit^.vel.x += power2
                         hit^.vel.y = ang
                     }
                     delete(hits)

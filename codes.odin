@@ -113,7 +113,9 @@ run_code :: proc(ent:^Entity) {
         }
 
         if c_params.act_move {
-            ent^.vel.x = c_params.move_speed
+            if (ent^.vel.x < c_params.move_speed) {
+                ent^.vel.x = c_params.move_speed
+            }
         }
 
         if c_params.act_seek {

@@ -66,6 +66,10 @@ vlf_init :: proc() {
     players[sys_player].status = .Inactive
     active_player = add_player("Player 1", 1, {100,245,100,255}, {active_width / 2, active_height})
 
+    if len(players) - 1 == 1{
+        max_reach = active_width * 0.49
+    }
+
     if show_debug {
         fmt.println("\n\n\n\n\n\n")
     }
@@ -170,8 +174,8 @@ vlf_test_init :: proc(ver:string) {
         case "brane1":
             for t := 0; t < 10; t += 1 {
                 brn_id := build_id(.Struck)
-                brn_x:f32 = mth.floor(rand.float32() * active_width)
-                brn_y:f32 = mth.floor(rand.float32() * active_height)
+                brn_x:f32 = (active_width * 0.5) + (50 - mth.floor(rand.float32() * 101))
+                brn_y:f32 = (active_height * 0.5) + mth.floor(rand.float32() * active_height * 0.5)
                 brn_v:f32 = 0.5
                 brn_a:f32 = rand.float32() * 360
                 b_key := "struck.brane"
