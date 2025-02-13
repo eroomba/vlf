@@ -218,7 +218,7 @@ draw_player :: proc() {
 				rl.ImageDrawRectangleRec(&tool_img, { 0, f32(t_rad2), f32(t_rad2 - (t_w * 0.5)), f32(t_rad2) }, { 255, 255, 255, 0 })
 				if players[active_player].brane_count > 0 {
 					br_tr:u8 = 100
-					br_dec:int = int(players[active_player].num_vars["brane_timer"] * 10)
+					br_dec:int = int(players[active_player].num_vars["tool_timer"] * 10)
 					if br_dec > 100 {
 						br_tr = 0
 					} else if br_dec <= 100 {
@@ -253,16 +253,59 @@ draw_player :: proc() {
 		rl.DrawTexturePro(textures[t_tool_idx], {0, 0, tool_w, tool_h}, {players[active_player].pos.x, players[active_player].pos.y, tool_w * 0.5, tool_h * 0.5}, {tool_w * 0.25, (tool_h * 0.5) - t_pad}, players[active_player].dir, { 255, 255, 255, 180})
 
 		font_size:i32 = 16
-		player_text := strings.concatenate({"s-branes: ", int_to_str(players[active_player].brane_count)})
-		text_w := i32(rl.MeasureTextEx(font, strings.clone_to_cstring(player_text), f32(font_size), 0).x)
-		img_w:i32 = 20
-		padding:i32 = 10
+		line_spacing:i32 = 3
+		player_text := []string{ "MICRO-TOOL: ", "Status: ", "[E to switch tool, SPACE to activate]" }
+		switch players[active_player].tool {
+			case .None:
+				player_text[0] = strings.concatenate({player_text[0], "n/a"})
+				player_text[01] = strings.concatenate({player_text[1], "n/a"})
+			case .Brane:
+				player_text[0] = strings.concatenate({player_text[0], "Release"})
+				if players[active_player].brane_count == 0 {
+					player_text[1] = strings.concatenate({player_text[1], "Empty"})
+				} else if players[active_player].num_vars["tool_timer"] > 0 {
+					player_text[1] = strings.concatenate({player_text[1], "Loading..."})
+				} else {
+					player_text[1] = strings.concatenate({player_text[1], "Ready"})
+				}
+			case .Pulse:
+				player_text[0] = strings.concatenate({player_text[0], "Pulse"})
+				if players[active_player].num_vars["tool_timer"] > 0 {
+					player_text[1] = strings.concatenate({player_text[1], "Charging..."})
+				} else {
+					player_text[1] = strings.concatenate({player_text[1], "Ready"})
+				}
+			case .Grab:
+				player_text[0] = strings.concatenate({player_text[0], "Retrieval"})
+				player_text[1] = strings.concatenate({player_text[1], "Not yet implemented"})
+				//if players[active_player].num_vars["tool_timer"] > 0 {
+				//	player_text[1] = strings.concatenate({player_text[1], "Resetting..."})
+				//} else {
+				//	player_text[1] = strings.concatenate({player_text[1], "Ready"})
+				//}
+		}
 
-		bar_w:i32 = img_w + text_w + padding
+		text_h:f32 = 0
+		text_w:f32 = 0
+		for l in 0..<len(player_text) {
+			f_size := font_size
+			if player_text[l][0] == '[' {
+				f_size = i32(f32(font_size) * 0.75)
+			}
+			text_size := rl.MeasureTextEx(font, strings.clone_to_cstring(player_text[l]), f32(f_size), 0)
+			if text_size.x > text_w {
+				text_w = f32(text_size.x)
+			}
+			text_h += f32(f_size)
+			text_h += l > 0 ? f32(line_spacing) : 0
+		}
+		
+		padding:f32 = mth.ceil(active_height * 0.01)
+		img_w:i32 = i32(20)
+
 		bar_h:i32 = i32(f32(font_size) / 2)
-		p_det_w:i32 = (padding * 2) + bar_w
-		p_det_h1:i32 = img_w + (padding * 2)
-		p_det_h:i32 = p_det_h1 + bar_h + padding
+		p_det_w:i32 = i32(padding * 2) + i32(text_w)
+		p_det_h:i32 = i32(text_h) + img_w + bar_h + i32(4 * padding)
 
 		p_det := rl.GenImageColor(i32(p_det_w), i32(p_det_h), {255,255,255,0})
 
@@ -275,25 +318,42 @@ draw_player :: proc() {
 		rl.ImageDrawRectangle(&p_det, round_r, 0, p_det_w - (2 * round_r), p_det_h,  p_det_bg)
 		rl.ImageDrawRectangle(&p_det, 0, round_r, p_det_w, p_det_h - (2 * round_r), p_det_bg)
 
-		b_offset_x:f32 = 0
-		b_offset_y:f32 = 0
-		b_color:rl.Color = { 0, 230, 230, 255}
-		b_ow:f32 = 200
-		b_oh:f32 = 200
-		b_rec:rl.Rectangle = {b_offset_x, b_offset_y, b_ow, b_oh}
-		b_tw:f32 = f32(img_w)
-		b_th:f32 = f32(img_w)
+		curr_y:f32 = padding
+
+		for l in 0..<len(player_text) {
+			f_size := font_size
+			if player_text[l][0] == '[' {
+				f_size = i32(f32(font_size) * 0.75)
+			}
+			rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(player_text[l]), { padding, curr_y }, f32(f_size), 0, { 30, 30, 30, 255 })
+			curr_y += f32(f_size)
+			curr_y += l > 0 ? f32(line_spacing) : 0
+		}
+
+		curr_y += padding
+
+		img_color:rl.Color = { 0, 230, 230, 255}
+		img_ow:f32 = 200
+		img_oh:f32 = 200
+		img_rec:rl.Rectangle = {0, 0, img_ow, img_oh}
+		img_tw:f32 = f32(img_w)
+		img_th:f32 = f32(img_w)
 
 		img_x:f32 = f32(padding)
-		img_y:f32 = f32(p_det_h1 / 2) - f32(img_w / 2)
-		rl.ImageDraw(&p_det, src_images[i_struck_idx], b_rec, { img_x, img_y, b_tw, b_th }, b_color)
+		img_y:f32 = curr_y
+		rl.ImageDraw(&p_det, src_images[i_struck_idx], img_rec, { img_x, img_y, img_tw, img_th }, img_color)
 
-		txt_x:f32 = f32((padding * 2) + img_w)
-		txt_y:f32 = f32(p_det_h1 / 2) - (f32(font_size) / 2)
-		rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(player_text), { txt_x, txt_y }, f32(font_size), 0, { 30, 30, 30, 255 })
+		b_txt := strings.concatenate({"S-branes: ", int_to_str(players[active_player].brane_count)})
+		b_txt_w := rl.MeasureTextEx(font, strings.clone_to_cstring(b_txt), f32(font_size), 0).x
+		b_txt_x:f32 = f32((padding * 2) + f32(img_tw))
+		b_txt_y:f32 = f32(curr_y + (img_th * 0.5)) - (f32(font_size) / 2)
+		rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(b_txt), { b_txt_x, b_txt_y }, f32(font_size), 0, { 30, 30, 30, 255 })
 
+		curr_y += img_th + padding
+
+		bar_w:i32 = i32(b_txt_w + padding + img_tw)
 		bar_x:f32 = f32(padding)
-		bar_y:f32 = f32(p_det_h1)
+		bar_y:f32 = curr_y
 		rl.ImageDrawRectangleLines(&p_det, {bar_x, bar_y, f32(bar_w), f32(bar_h)}, 1, { 120, 120, 120, 200 })
 		bar_per:f32 = f32(bar_w) * players[active_player].brane_percent
 		rl.ImageDrawRectangleRec(&p_det, {bar_x + 1, bar_y + 1, f32(bar_per - 2), f32(bar_h - 2)}, { 80, 220, 220, 200 })
