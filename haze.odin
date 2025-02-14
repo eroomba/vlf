@@ -52,7 +52,7 @@ init_haze :: proc() {
             }
             (&haze[curr_idx])^.nodes[chmi("d1")] = 2 + int(rand.float32() * 3)
             (&haze[curr_idx])^.nodes[chmi("d2")] = 2 + int(rand.float32() * 3)
-            (&haze[curr_idx])^.nodes[chmi("x")] = 3
+            (&haze[curr_idx])^.nodes[chmi("x")] = 2
             (&haze[curr_idx])^.nodes[chmi("o1")] = 20 + int(rand.float32() * 41)
             (&haze[curr_idx])^.nodes[chmi("o2")] = 20 + int(rand.float32() * 41)
             (&haze[curr_idx])^.nodes[chmi("o3")] = 20 + int(rand.float32() * 41)
@@ -94,7 +94,7 @@ run_haze :: proc() {
                 }
 
                 o_id := build_id(.Ort)
-                append(&entities, Entity{
+                entities[o_id] = Entity{
                     id = o_id,
                     core = &entity_cores[o_sub_type_key],
                     pos = {o_x, o_y },
@@ -112,7 +112,7 @@ run_haze :: proc() {
                     data = form.result_sub_type,
                     parent = "",
                     owner = 0
-                })
+                }
             } 
         }
     }
@@ -120,10 +120,10 @@ run_haze :: proc() {
 
 haze_query :: proc(ent:^Entity, check_types:[]string) -> [dynamic]^Haze_Node {
     ret_val := make([dynamic]^Haze_Node)
-    start_c:f32 = mth.floor((ent^.pos.x - ent^.core.range) / haze_w)
-    end_c:f32 = mth.floor((ent^.pos.x + ent^.core.range) / haze_w)
-    start_r:f32 = mth.floor((ent^.pos.y - ent^.core.range) / haze_h)
-    end_r:f32 = mth.floor((ent^.pos.y + ent^.core.range) / haze_h)
+    start_c:f32 = mth.floor((ent.pos.x - ent.core.range) / haze_w)
+    end_c:f32 = mth.floor((ent.pos.x + ent.core.range) / haze_w)
+    start_r:f32 = mth.floor((ent.pos.y - ent.core.range) / haze_h)
+    end_r:f32 = mth.floor((ent.pos.y + ent.core.range) / haze_h)
 
     if start_c < 0 {
         start_c = 0

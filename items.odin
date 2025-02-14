@@ -46,21 +46,22 @@ run_items :: proc() {
 }
 
 run_item :: proc(item:^Item) {
-    if item^.status == .Active {
-        switch item^.i_type {
+    if item.status == .Active {
+        switch item.i_type {
             case .None:
             case .Pulse:
-                power := item^.num_vars["power"]
-                step := item^.num_vars["step"]
-                h_pos := item^.pos
+                power := item.num_vars["power"]
+                step := item.num_vars["step"]
+                h_pos := item.pos
 
                 if step == 0 {
 
                     h_range:f32 = active_width * 0.15
                     hits := hash_find_2(h_pos, h_range)
-                    for hit in hits {
-                        ang:f32 = mth.atan2(hit^.pos.y - h_pos.y, hit^.pos.x - h_pos.x) * 180 / mth.π
-                        dist:f32 = rl.Vector2Distance(h_pos, hit^.pos)
+                    for hit_id in hits {
+                        hit := &entities[hit_id]
+                        ang:f32 = mth.atan2(hit.pos.y - h_pos.y, hit.pos.x - h_pos.x) * 180 / mth.π
+                        dist:f32 = rl.Vector2Distance(h_pos, hit.pos)
                         power2:f32 = power * (1 - (dist / h_range))
                         hit^.vel.x += power2
                         hit^.vel.y = ang

@@ -43,9 +43,9 @@ vlf_draw :: proc() {
 
     rl.DrawTexture(textures[t_bg_idx], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
 
-	for &ent in entities {
-		if ent.status == .Active {
-			draw_entity(&ent)
+	for ent in entities {
+		if entities[ent].status == .Active {
+			draw_entity(&entities[ent])
 		}
 	}
 
@@ -53,7 +53,7 @@ vlf_draw :: proc() {
 		draw_environment()
 	}
 
-	if info_item != nil && info_item^.status == .Active && info_item_timer > 0 {
+	if len(info_item) > 0 && info_item in entities && entities[info_item].status == .Active && info_item_timer > 0 {
 		draw_info()
 	}
 
@@ -65,38 +65,38 @@ vlf_draw :: proc() {
 }
 
 draw_entity :: proc(ent:^Entity) {
-	switch ent^.core.e_type {
+	switch ent.core.e_type {
 		case .None:
 		case .Chem:
 		case .Ort:
 			o_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent^.decay) / 10))
+			if ent.decay <= 10 {
+				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent.decay) / 10))
 			}
 			ort_thw:f32 = mth.floor(screen_height * 0.013)
 			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {ent.pos.x, ent.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, ent.vel.y, o_params.color)
 		case .Snip:
 			sn_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent^.decay) / 10))
+			if ent.decay <= 10 {
+				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent.decay) / 10))
 			}
 			snip_th:f32 = mth.floor(screen_height * 0.015)
 			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
 			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {ent.pos.x, ent.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, ent.vel.y, sn_params.color)
 		case .Strand:
 			st_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent^.decay) / 10))
+			if ent.decay <= 10 {
+				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent.decay) / 10))
 			}
 			strand_th:f32 = mth.floor(screen_height * 0.017)
 			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
 			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
 		case .Proto:
 			pr_params := item_draw_params(ent)
-			if ent^.life <= 10 {
-				pr_params.color[3] = u8(f32(pr_params.color[3]) * (f32(ent^.life) / 10))
+			if ent.life <= 10 {
+				pr_params.color[3] = u8(f32(pr_params.color[3]) * (f32(ent.life) / 10))
 			}
-			proto_rot := ent^.dir
+			proto_rot := ent.dir
 			proto_th:f32 = mth.floor(screen_height * 0.032)
 			proto_tw:f32 = (pr_params.rect.width / pr_params.rect.height) * proto_th
 			proto_origin:rl.Vector2 = {proto_tw / 2, proto_th / 2}
@@ -104,7 +104,7 @@ draw_entity :: proc(ent:^Entity) {
 			pr_img:rl.Image = rl.GenImageColor(i32(proto_tw) * 2, i32(proto_th), {255, 255, 255, 0});
 			rl.ImageDraw(&pr_img, src_images[i_proto_idx], pr_params.rect, { 0, 0, proto_tw, proto_th}, rl.WHITE)
 
-			pr_types := check_type(ent^.data)
+			pr_types := check_type(ent.data)
 
 			skin_color:rl.Color = { 255, 255, 255, 255 }
 			has_skin:bool = false
@@ -118,7 +118,7 @@ draw_entity :: proc(ent:^Entity) {
 				has_skin = true
 			}
 			
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "Simple":
 					if .Move in pr_types {
 						mv_rect := pr_params.rect
@@ -127,18 +127,9 @@ draw_entity :: proc(ent:^Entity) {
 						has_skin = true
 					}		
 				case "Complex":
-					proto_rot = ent^.vel.y + 180
+					proto_rot = ent.vel.y + 180
 					proto_origin.x += proto_tw / 4
 					if .Move in pr_types {
-						//if step %% 4 == 0 {
-							//p_val := ent^.num_vars["t_step"]
-							//for ent^.num_vars["t_step"] == p_val {
-							//	ent^.num_vars["t_step"] = 100 * mth.floor(rand.float32() * 6)
-							//}
-						//}
-						//tail_off_x:f32 = 0
-						//tail_off_y:f32 =  ent^.num_vars["t_step"]
-						//rl.ImageDraw(&pr_img, src_images[i_proto_parts_idx], { tail_off_x, tail_off_y, 300, 100}, { proto_tw * 0.89, proto_th * 0.25, proto_tw, proto_th / 2}, skin_color)
 						t_color:rl.Color = { 204, 204, 204, 255 }
 						t_ow:f32 = f32(proto_tw) * 5
 						t_oh:f32 = f32(proto_th / 2) * 4
@@ -178,8 +169,8 @@ draw_entity :: proc(ent:^Entity) {
 			rl.DrawTexturePro(textures[t_proto_draw_idx], { 0, 0, proto_tw * 2, proto_th }, {ent.pos.x, ent.pos.y, proto_tw * 2, proto_th }, proto_origin, proto_rot, pr_params.color)
 		case .Struck:
 			stk_params := item_draw_params(ent)
-			if ent^.decay <= 10 {
-				stk_params.color[3] = u8(f32(stk_params.color[3]) * (f32(ent^.decay) / 10))
+			if ent.decay <= 10 {
+				stk_params.color[3] = u8(f32(stk_params.color[3]) * (f32(ent.decay) / 10))
 			}
 			stk_rot := ent.dir
 			struck_th:f32 = mth.floor(screen_height * 0.028)
@@ -370,12 +361,12 @@ draw_player :: proc() {
 }
 
 draw_item :: proc(item:^Item) {
-	if item^.status == .Active {
-		switch item^.i_type {
+	if item.status == .Active {
+		switch item.i_type {
 			case .None:
 			case .Pulse:
-				step := item^.num_vars["step"]
-				p_pos := item^.pos
+				step := item.num_vars["step"]
+				p_pos := item.pos
 
 				p_rad:f32 = player_tool_rad + f32(step * 5)
 				//p_alpha := u8(240 * (1 - (step / 5))) 
@@ -386,12 +377,13 @@ draw_item :: proc(item:^Item) {
 }
 
 draw_info :: proc() {
-	if info_item != nil && info_item^.status == .Active && info_item_timer > 0 {
-		info_id := info_item^.id
-		info_type := info_item^.core.e_type
-		info_sub_type := info_item^.core.sub_type
-		info_data := info_item^.data
-		info_params := item_draw_params(info_item)
+	if len(info_item) > 0 && info_item in entities && entities[info_item].status == .Active && info_item_timer > 0 {
+		info_item_i := &entities[info_item]
+		info_id := info_item_i.id
+		info_type := info_item_i.core.e_type
+		info_sub_type := info_item_i.core.sub_type
+		info_params := item_draw_params(info_item_i)
+		info_data := info_item_i.data
 
 		buf:[64]u8
 
@@ -422,36 +414,49 @@ draw_info :: proc() {
 			case .Ort:
 			case .Snip:
 				if !(info_sub_type == "ex" || info_sub_type == "block") {
-					append(&lines, strings.concatenate({"Code: ", info_data}))
+					append(&lines, strings.concatenate({"Code: ", info_item_i.data}))
 					text_height += line_height
 				}
 			case .Strand:
-				append(&lines, "Code: ")
+				append(&lines, "_Code: ")
 				text_height += line_height
 
-				code_parts := make([dynamic]string)
-				code := info_data
-				c_idx:int = 0
-				curr_part:string = ""
-				for c_idx < len(code) {
-					if len(curr_part) == 21 {
-						append(&code_parts, curr_part)
-						curr_part = ""
+				cd_idx:int = 0
+				for cd_idx < len(info_data) {
+					if len(strings.cut(info_data, cd_idx)) > 21 {
+						append(&lines, strings.concatenate({"_",strings.cut(info_data, cd_idx, 21)}))
+						cd_idx += 21
+						text_height += f32(font_size)
+					} else {
+						append(&lines, strings.concatenate({"_",strings.cut(info_data, cd_idx)}))
+						cd_idx = len(info_data)
+						text_height += f32(font_size)
 					}
-					curr_part = strings.concatenate({curr_part, strings.cut(code, c_idx, 1)})
-					c_idx += 1
-				}
-				if len(curr_part) > 0 {
-					append(&code_parts, curr_part)
 				}
 
-				for c := 0; c < len(code_parts); c += 1 {
-					append(&lines, code_parts[c])
-					text_height += line_height
+				if len(info_data) >= dna_active_len {
+					lines[len(lines) - 1] = strings.concatenate({lines[len(lines) - 1],"*"})
+					append(&lines, "! * active length")
+					text_height += f32(font_size)
 				}
-
-				delete(code_parts)
+				
 			case .Proto:
+				append(&lines, "_Code: ")
+				text_height += line_height
+				
+				cd_idx:int = 0
+				for cd_idx < len(info_data) {
+					if len(strings.cut(info_data, cd_idx)) > 21 {
+						append(&lines, strings.concatenate({"_",strings.cut(info_data, cd_idx, 21)}))
+						text_height += f32(line_height)
+						cd_idx += 21
+					} else {
+						append(&lines, strings.concatenate({"_",strings.cut(info_data, cd_idx)}))
+						cd_idx = len(info_data)
+						text_height += f32(line_height)
+					}
+				}
+
 			case .Struck:
 		}
 
@@ -503,6 +508,15 @@ draw_info :: proc() {
 
 				rl.ImageDraw(&info, src_images[i_strand_idx], info_params.rect, {t_x, t_y, strand_tw, strand_th }, info_params.color)
 			case .Proto:
+				info_params.color[3] = 255
+
+				proto_th:f32 = img_height
+				proto_tw:f32 = (info_params.rect.width / info_params.rect.height) * proto_th
+
+				t_x:f32 = (f32(info_w) / 2) - (proto_tw / 2)
+				t_y:f32 = f32(padding)
+
+				rl.ImageDraw(&info, src_images[i_proto_idx], info_params.rect, {t_x, t_y, proto_tw, proto_th }, info_params.color)
 			case .Struck:
 				info_params.color[3] = 255
 
@@ -518,8 +532,23 @@ draw_info :: proc() {
 		y_off:f32 = f32(2 * padding) + img_height
 
 		for i in 0..<len(lines) {
-			rl.ImageDrawTextEx(&info, font, strings.clone_to_cstring(lines[i]), { f32(padding), y_off }, f32(font_size), 0, text_color)
-			y_off += line_height
+			f_size := font_size
+			t_off := y_off
+			l_height := line_height
+
+			line1 := lines[i]
+			if line1[0:1] == "_" {
+				line1 = strings.cut(line1,1)
+				l_height -= line_spacing
+			} else if line1[0:1] == "!" {
+				line1 = strings.cut(line1,1)
+				f_size = 12
+				t_off += f32(font_size - f_size)
+			}
+			line2 := strings.clone_to_cstring(line1)
+
+			rl.ImageDrawTextEx(&info, font, line2, { f32(padding), t_off }, f32(f_size), 0, text_color)
+			y_off += l_height
 		}
 
 		delete(lines)
@@ -780,7 +809,7 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 	ret_rec:rl.Rectangle = { 0, 0, 0, 0 }
 	ret_color:rl.Color = { 255, 255, 255, 255 }
 
-	switch ent^.core.e_type {
+	switch ent.core.e_type {
 		case .None:
 		case .Chem:
 		case .Ort:
@@ -789,7 +818,7 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			o_alpha:u8 = 70
 			ret_color = { 102, 102, 102, o_alpha}
 
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "A":
 					offset_x = 0
 					ret_color = { 255, 0, 0, o_alpha}
@@ -825,7 +854,7 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			sn_alpha:u8 = 90
 			ret_color = { 102, 102, 102, sn_alpha}
 
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "pre":
 					offset_y = 0
 					if strings.contains(ent.data,"U") {
@@ -848,8 +877,8 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 					ret_color = { 153, 255, 153, sn_alpha}
 				case "build":
 					offset_y = 400
-					if "b_step" in ent^.num_vars {
-						offset_y += ent^.num_vars["b_step"] * 100
+					if "b_step" in ent.num_vars {
+						offset_y += ent.num_vars["b_step"] * 100
 					}
 					ret_color = { 255, 204, 0, sn_alpha}
 			}
@@ -864,17 +893,17 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			st_alpha:u8 = 110
 			ret_color = { 102, 102, 102, st_alpha}
 
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "D":
 					offset_y = 0
 					ret_color = { 255, 60, 204, st_alpha}
-					if len(ent^.data) >= 18 {
+					if len(ent.data) >= dna_active_len {
 						offset_y = 450
 					}
 				case "R":
 					offset_y = 150
-					if "b_step" in ent^.num_vars && ent^.num_vars["b_step"] > 0  {
-						offset_y = 450 + (ent^.num_vars["b_step"] * 150)
+					if "b_step" in ent.num_vars && ent.num_vars["b_step"] > 0  {
+						offset_y = 450 + (ent.num_vars["b_step"] * 150)
 					}
 					ret_color = { 255, 204, 0, st_alpha}
 			}
@@ -889,7 +918,7 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			pr_alpha:u8 = 160
 			ret_color = { 102, 102, 102, pr_alpha}
 
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "Simple":
 					offset_x = 300
 					ret_color = { 80, 255, 80, pr_alpha}
@@ -907,7 +936,7 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			stk_alpha:u8 = 100
 			ret_color = { 102, 102, 102, stk_alpha}
 
-			switch ent^.core.sub_type {
+			switch ent.core.sub_type {
 				case "brane":
 					offset_y = 0
 					ret_color = { 0, 230, 230, stk_alpha}

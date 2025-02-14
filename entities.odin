@@ -119,6 +119,7 @@ active_d :: "ABGD"
 active_r :: "ABGU"
 knot_count:int = 3
 brane_count:int = 3
+dna_active_len:int = 18
 
 init_cores :: proc() {
 
@@ -278,13 +279,13 @@ run_entity :: proc(ent:^Entity) {
 }
 
 run_ort :: proc(ort:^Entity) {
-    if ort^.status == .Active {
-        ort^.decay -= 1
-        if (ort^.decay <= 0) {
+    if ort.status == .Active {
+        ort.decay -= 1
+        if (ort.decay <= 0) {
             ort^.status = .Inactive
             decay_entity(ort)
         } else {
-            if ort^.core.sub_type == "E" {
+            if ort.core.sub_type == "E" {
                 g_count := haze_query(ort, {"g1","g2"})
                 if len(g_count) > 0 && rand.float32() > 0.999 {
                     ort^.status = .Inactive
@@ -296,7 +297,7 @@ run_ort :: proc(ort:^Entity) {
                     sn_vel := ort.vel
 
                     sn_id:string = build_id(.Snip)
-                    append(&entities, Entity{
+                    entities[sn_id] = Entity{
                         id = sn_id,
                         core = &entity_cores[sn_key],
                         pos = sn_pos,
@@ -314,23 +315,23 @@ run_ort :: proc(ort:^Entity) {
                         data = "E--",
                         parent = "",
                         owner = 0
-                    })
+                    }
                 }
             }
             else {
                 close := hash_find(ort, { .Ort })
                 if len(close) >= 2 {
-                    if ((strings.contains(active_d,ort^.data) && strings.contains(active_d,close[0]^.data) && strings.contains(active_d,close[1]^.data)) || 
-                            (strings.contains(active_r, ort^.data) && strings.contains(active_r,close[0]^.data) && strings.contains(active_r, close[1]^.data))) {
-                        sn_pos := ort^.pos
-                        sn_vel := ort^.vel
-                        sn_data := ort^.data
-                        sn_weight := ort^.core.weight
+                    if ((strings.contains(active_d,ort.data) && strings.contains(active_d,entities[close[0]].data) && strings.contains(active_d,entities[close[1]].data)) || 
+                            (strings.contains(active_r, ort.data) && strings.contains(active_r,entities[close[0]].data) && strings.contains(active_r, entities[close[1]].data))) {
+                        sn_pos := ort.pos
+                        sn_vel := ort.vel
+                        sn_data := ort.data
+                        sn_weight := ort.core.weight
                         for i := 0; i < 2; i += 1 {
-                            close[i]^.status = .Inactive
-                            sn_pos += close[i]^.pos
-                            sn_vel = momentum_add(sn_vel, sn_weight, close[i]^.vel, close[i]^.core.weight)
-                            sn_data = strings.concatenate({sn_data, close[i]^.data })
+                            (&entities[close[i]])^.status = .Inactive
+                            sn_pos += entities[close[i]].pos
+                            sn_vel = momentum_add(sn_vel, sn_weight, entities[close[i]].vel, entities[close[i]].core.weight)
+                            sn_data = strings.concatenate({sn_data, entities[close[i]].data })
                         }
                         ort^.status = .Inactive
 
@@ -346,7 +347,7 @@ run_ort :: proc(ort:^Entity) {
                         } 
 
                         sn_id:string = build_id(.Snip)
-                        append(&entities, Entity{
+                        entities[sn_id] = Entity{
                             id = sn_id,
                             core = &entity_cores[sn_key],
                             pos = sn_pos,
@@ -364,17 +365,17 @@ run_ort :: proc(ort:^Entity) {
                             data = sn_data,
                             parent = "",
                             owner = 0
-                        })
+                        }
                     }
                 }
-                else if len(close) == 1 && ((strings.contains(active_d, ort^.data) && strings.contains(active_d,close[0]^.data)) || 
-                            (strings.contains(active_r,ort^.data) && strings.contains(active_r,close[0]^.data))) { 
-                    close[0]^.status = .Inactive
+                else if len(close) == 1 && ((strings.contains(active_d, ort.data) && strings.contains(active_d,entities[close[0]].data)) || 
+                            (strings.contains(active_r,ort.data) && strings.contains(active_r,entities[close[0]].data))) { 
+                    (&entities[close[0]])^.status = .Inactive
                     ort^.status = .Inactive
 
-                    sn_pos := ort^.pos + close[0]^.pos
-                    sn_vel := momentum_add(ort^.vel, ort^.core.weight, close[0]^.vel, close[0]^.core.weight)
-                    sn_data := strings.concatenate({ort^.data, close[0]^.data })
+                    sn_pos := ort.pos + entities[close[0]].pos
+                    sn_vel := momentum_add(ort.vel, ort.core.weight, entities[close[0]].vel, entities[close[0]].core.weight)
+                    sn_data := strings.concatenate({ort.data, entities[close[0]].data })
 
                     ort^.status = .Inactive
 
@@ -382,7 +383,7 @@ run_ort :: proc(ort:^Entity) {
                     sn_pos /= 2
 
                     sn_id:string = build_id(.Snip)
-                    append(&entities, Entity{
+                    entities[sn_id] = Entity{
                         id = sn_id,
                         core = &entity_cores[sn_key],
                         pos = sn_pos,
@@ -400,7 +401,7 @@ run_ort :: proc(ort:^Entity) {
                         data = sn_data,
                         parent = "",
                         owner = 0
-                    })
+                    }
                 }
                 delete(close)
             }
@@ -409,23 +410,23 @@ run_ort :: proc(ort:^Entity) {
 }
 
 run_snip :: proc(snip:^Entity) {
-    if snip^.status == .Active {
+    if snip.status == .Active {
         snip^.decay -= 1
-        if (snip^.decay <= 0) {
+        if (snip.decay <= 0) {
             snip^.status = .Inactive
             decay_entity(snip)
         } else { 
-            switch snip.core^.sub_type {
+            switch snip.core.sub_type {
                 case "pre":
                     close := hash_find(snip, {.Ort })
-                    if len(close) > 0 && ((!strings.contains(snip^.data, "U") && strings.contains(active_d,close[0]^.data)) || 
-                            (strings.contains(snip^.data, "U") && strings.contains(active_r,close[0]^.data))) {
-                        close[0]^.status = .Inactive
+                    if len(close) > 0 && ((!strings.contains(snip.data, "U") && strings.contains(active_d,entities[close[0]].data)) || 
+                            (strings.contains(snip.data, "U") && strings.contains(active_r,entities[close[0]].data))) {
+                        (&entities[close[0]])^.status = .Inactive
                         snip^.status = .Inactive
 
-                        sn_pos := snip^.pos + close[0]^.pos
-                        sn_vel := momentum_add(snip^.vel, snip^.core.weight, close[0]^.vel, close[0]^.core.weight)
-                        sn_data := strings.concatenate({snip^.data, close[0]^.data })
+                        sn_pos := snip.pos + entities[close[0]].pos
+                        sn_vel := momentum_add(snip.vel, snip.core.weight, entities[close[0]].vel, entities[close[0]].core.weight)
+                        sn_data := strings.concatenate({snip.data, entities[close[0]].data })
 
                         sn_key := "snip.go"
                         sn_pos /= 2
@@ -439,7 +440,7 @@ run_snip :: proc(snip:^Entity) {
                         } 
 
                         sn_id:string = build_id(.Snip)
-                        append(&entities, Entity{
+                        entities[sn_id] = Entity{
                             id = sn_id,
                             core = &entity_cores[sn_key],
                             pos = sn_pos,
@@ -457,25 +458,26 @@ run_snip :: proc(snip:^Entity) {
                             data = sn_data,
                             parent = "",
                             owner = 0
-                        })
+                        }
                     }
                     delete(close)
                 case "go":
 
                     close := hash_find(snip, { .Snip })
                     if len(close) > 0 {
-                        st_code:string = snip^.data
+                        st_code:string = snip.data
                         combined:bool = false
 
-                        st_vel := snip^.vel
-                        st_weight := snip^.core.weight
+                        st_vel := snip.vel
+                        st_weight := snip.core.weight
 
-                        for sn in close {
-                            if sn^.core.sub_type == "go" && ((!strings.contains(st_code,"U") && !strings.contains(sn^.data,"U")) ||
-                                (strings.contains(st_code,"U") && strings.contains(sn^.data,"U"))) {
-                                    sn^.status = .Inactive
-                                    st_code = strings.concatenate({st_code, sn^.data})
-                                    st_vel = momentum_add(st_vel, st_weight, sn^.vel, sn^.core.weight)
+                        for sn_id in close {
+                            sn := &entities[sn_id]
+                            if sn.core.sub_type == "go" && ((!strings.contains(st_code,"U") && !strings.contains(sn.data,"U")) ||
+                                (strings.contains(st_code,"U") && strings.contains(sn.data,"U"))) {
+                                    (&entities[sn_id])^.status = .Inactive
+                                    st_code = strings.concatenate({st_code, sn.data})
+                                    st_vel = momentum_add(st_vel, st_weight, sn.vel, sn.core.weight)
                                     combined = true
                                 }
                         }
@@ -493,10 +495,10 @@ run_snip :: proc(snip:^Entity) {
                                     st_num_vars["b_step"] = 0
                                 }
                             }
-                            st_pos:rl.Vector2 = snip^.pos
+                            st_pos:rl.Vector2 = snip.pos
 
                             st_id:string = build_id(.Strand)
-                            append(&entities, Entity{
+                            entities[st_id] = Entity{
                                 id = st_id,
                                 core = &entity_cores[st_key],
                                 pos = st_pos,
@@ -514,28 +516,29 @@ run_snip :: proc(snip:^Entity) {
                                 data = st_code,
                                 parent = "",
                                 owner = 0
-                            })
+                            }
                         }
                     }
                     delete(close)
                 case "ex":
 
                     close := hash_find(snip, { .Snip })
-                    ex_b := make([dynamic]^Entity)
-                    for sn in close {
-                        if sn^.core.sub_type == "ex" && len(ex_b) < knot_count - 1 {
-                            append(&ex_b, sn)
+                    ex_b := make([dynamic]string)
+                    for sn_id in close {
+                        sn := &entities[sn_id]
+                        if sn.core.sub_type == "ex" && len(ex_b) < knot_count - 2 {
+                            append(&ex_b, sn_id)
                         }
                     }
 
                     if len(ex_b) == knot_count - 1 {
-                        k_pos := snip^.pos
-                        k_vel := snip^.vel
-                        k_w := snip^.core.weight
-                        for sn in ex_b {
-                            sn^.status = .Inactive
-                            k_pos += sn^.pos
-                            k_vel = momentum_add(k_vel, k_w, sn^.vel, sn^.core.weight)
+                        k_pos := snip.pos
+                        k_vel := snip.vel
+                        k_w := snip.core.weight
+                        for sn_id in ex_b {
+                            (&entities[sn_id])^.status = .Inactive
+                            k_pos += entities[sn_id].pos
+                            k_vel = momentum_add(k_vel, k_w, entities[sn_id].vel, entities[sn_id].core.weight)
                         }
 
                         snip^.status = .Inactive
@@ -544,7 +547,7 @@ run_snip :: proc(snip:^Entity) {
                         k_key:string = "struck.knot"
 
                         stk_id := build_id(.Struck)
-                        append(&entities, Entity{
+                        entities[stk_id] = Entity{
                             id = k_id,
                             core = &entity_cores[k_key],
                             pos = k_pos,
@@ -562,34 +565,35 @@ run_snip :: proc(snip:^Entity) {
                             data = "KNOT",
                             parent = "",
                             owner = 0
-                        })
+                        }
                     }
 
                     delete(ex_b)
                     delete(close)
                 case "block":
 
-                    close := hash_find_2(snip^.pos, snip^.core.range * 3, { .Snip })
-                    blk_b := make([dynamic]^Entity)
-                    blk_b_2 := make([dynamic]^Entity)
-                    for sn in close {
-                        if snip^.id != sn^.id && sn^.core.sub_type == "block" {
-                            append(&blk_b_2, sn)
-                            dist := rl.Vector2Distance(snip^.pos, sn^.pos)
-                            if dist <= snip^.core.range && len(blk_b) < brane_count - 1 {
-                                append(&blk_b, sn)
+                    close := hash_find_2(snip.pos, snip.core.range * 3, { .Snip })
+                    blk_b := make([dynamic]string)
+                    blk_b_2 := make([dynamic]string)
+                    for sn_id in close {
+                        sn := &entities[sn_id]
+                        if snip.id != sn.id && sn.core.sub_type == "block" {
+                            append(&blk_b_2, sn_id)
+                            dist := rl.Vector2Distance(snip.pos, sn.pos)
+                            if dist <= snip.core.range && len(blk_b) < brane_count - 2 {
+                                append(&blk_b, sn_id)
                             }
                         }
                     }
 
                     if len(blk_b) == brane_count - 1 {
-                        b_pos := snip^.pos
-                        b_vel := snip^.vel
-                        b_w := snip^.core.weight
-                        for sn in blk_b {
-                            sn^.status = .Inactive
-                            b_pos += sn^.pos
-                            b_vel = momentum_add(b_vel, b_w, sn^.vel, sn^.core.weight)
+                        b_pos := snip.pos
+                        b_vel := snip.vel
+                        b_w := snip.core.weight
+                        for sn_id in blk_b {
+                            (&entities[sn_id])^.status = .Inactive
+                            b_pos += entities[sn_id].pos
+                            b_vel = momentum_add(b_vel, b_w, entities[sn_id].vel, entities[sn_id].core.weight)
                         }
 
                         snip^.status = .Inactive
@@ -598,7 +602,7 @@ run_snip :: proc(snip:^Entity) {
                         b_key:string = "struck.brane"
 
                         brn_id := build_id(.Struck)
-                        append(&entities, Entity{
+                        entities[brn_id] = Entity{
                             id = brn_id,
                             core = &entity_cores[b_key],
                             pos = b_pos,
@@ -616,24 +620,24 @@ run_snip :: proc(snip:^Entity) {
                             data = "BRANE",
                             parent = "",
                             owner = 0
-                        })
+                        }
                     }
                     else if len(blk_b_2) > 0 {
-                        t_pos := blk_b_2[0]^.pos
-                        t_ang := mth.atan2(t_pos.y - snip^.pos.y, t_pos.x - snip^.pos.x) * 180 / mth.π
+                        t_pos := entities[blk_b_2[0]].pos
+                        t_ang := mth.atan2(t_pos.y - snip.pos.y, t_pos.x - snip.pos.x) * 180 / mth.π
                         snip^.vel.y = t_ang
-                        dist := rl.Vector2Distance(snip^.pos, t_pos)
-                        min_dist := snip^.core.range * 1.5
-                        if dist > min_dist && snip^.vel.x < 0.1 {
+                        dist := rl.Vector2Distance(snip.pos, t_pos)
+                        min_dist := snip.core.range * 1.5
+                        if dist > min_dist && snip.vel.x < 0.1 {
                             snip^.vel.x = 0.05
-                        } else if dist <= snip^.core.range {
-                            snip^.vel.y = snip^.vel.y - 180 < 0 ? 180 + snip^.vel.y : snip^.vel.y - 180
-                            if snip^.vel.x == 0 {
+                        } else if dist <= snip.core.range {
+                            snip^.vel.y = snip.vel.y - 180 < 0 ? 180 + snip.vel.y : snip.vel.y - 180
+                            if snip.vel.x == 0 {
                                 snip^.vel.x = 0.05
                             }
                         } else if dist <= min_dist {
-                            if snip^.vel.x > 0 {
-                                snip^.vel.x = snip^.vel.x - 0.1 > 0 ? snip^.vel.x - 0.1 : 0 
+                            if snip.vel.x > 0 {
+                                snip^.vel.x = snip.vel.x - 0.1 > 0 ? snip.vel.x - 0.1 : 0 
                             }
                         }
                     }
@@ -645,16 +649,16 @@ run_snip :: proc(snip:^Entity) {
         }
     }
 
-    if snip^.status == .Active && len(snip^.data) >= 3 {
+    if snip.status == .Active && len(snip.data) >= 3 {
         run_code(snip)
     }
 }
 
 run_strand :: proc(strand:^Entity) {
     
-    if strand^.status == .Active {
+    if strand.status == .Active {
         strand^.decay -= 1
-        if strand^.decay <= 0 {
+        if strand.decay <= 0 {
             strand^.status = .Inactive
             decay_entity(strand)
         } else {
@@ -662,18 +666,19 @@ run_strand :: proc(strand:^Entity) {
             combined:bool = false
             brane:^Entity = nil
 
-            st_vel := strand^.vel
-            st_weight := strand^.core.weight
+            st_vel := strand.vel
+            st_weight := strand.core.weight
 
-            for ent in close {
-                if strand^.core.sub_type == "D" && ent^.core.e_type == .Struck && ent^.core.sub_type == "brane" && brane == nil {
+            for ent_id in close {
+                ent := &entities[ent_id]
+                if strand.core.sub_type == "D" && ent.core.e_type == .Struck && ent.core.sub_type == "brane" && brane == nil {
                     brane = ent
-                } else if ent^.core.e_type == .Snip || ent^.core.e_type == .Strand {
-                    if (!strings.contains(strand^.data,"U") && !strings.contains(ent^.data,"U")) || (strings.contains(strand^.data,"U") && strings.contains(ent^.data,"U")) {
-                        if (ent^.core.e_type == .Snip && ent^.core.sub_type == "go") || ent^.core.e_type == .Strand {
+                } else if ent.id != strand.id && (ent.core.e_type == .Snip || ent.core.e_type == .Strand) {
+                    if (!strings.contains(strand.data,"U") && !strings.contains(ent.data,"U")) || (strings.contains(strand.data,"U") && strings.contains(ent.data,"U")) {
+                        if (ent.core.e_type == .Snip && ent.core.sub_type == "go") || ent.core.e_type == .Strand {
                             ent^.status = .Inactive
-                            strand^.data = strings.concatenate({strand^.data, ent^.data})
-                            st_vel = momentum_add(st_vel, st_weight, ent^.vel, ent^.core.weight)
+                            strand^.data = strings.concatenate({strand.data, ent.data})
+                            st_vel = momentum_add(st_vel, st_weight, ent.vel, ent.core.weight)
                             combined = true
                         }
                     }
@@ -681,15 +686,15 @@ run_strand :: proc(strand:^Entity) {
             }
             delete(close)
 
-            if brane != nil {
+            if brane != nil && len(strand.data) >= dna_active_len {
                 pro_id := build_id(.Proto)
                 pro_key:string = "proto.Simple"
-                pro_data:string = strand^.data
+                pro_data:string = strand.data
 
-                pro_pos := strand^.pos
-                pro_vel := strand^.vel
+                pro_pos := strand.pos
+                pro_vel := strand.vel
 
-                append(&entities, Entity{
+                entities[pro_id] = Entity{
                     id = pro_id,
                     core = &entity_cores[pro_key],
                     pos = pro_pos,
@@ -707,52 +712,52 @@ run_strand :: proc(strand:^Entity) {
                     data = pro_data,
                     parent = "",
                     owner = 0
-                })
+                }
 
                 brane^.status = .Inactive
                 strand^.status = .Inactive
             } else if combined {
-                strand^.decay = strand^.core.decay
-                types := check_type(strand^.data)
+                strand^.decay = strand.core.decay
+                types := check_type(strand.data)
                 strand^.vel = st_vel
-                if .Build in types && !("b_step" in strand^.num_vars) {
+                if .Build in types && !("b_step" in strand.num_vars) {
                     strand^.num_vars["b_step"] = 0
                 }
             }
         }
     }
 
-    if strand^.status == .Active {
+    if strand.status == .Active {
         run_code(strand)
     }
 }
 
 run_proto :: proc(proto:^Entity) {
-    if proto^.status == .Active {
+    if proto.status == .Active {
         if step %% 24 == 0 {
             proto^.life -= 1
         }
-        if proto^.life <= 0 {
+        if proto.life <= 0 {
             proto^.status = .Inactive
             decay_entity(proto)
         } else {
             
-            if proto^.core.sub_type == "Complex" {
-                if !("t_step" in proto^.num_vars) {
+            if proto.core.sub_type == "Complex" {
+                if !("t_step" in proto.num_vars) {
                     proto^.num_vars["t_step"] = 0
                 }
             }
 
-            if proto^.core.sub_type == "Simple" && step %% 6 == 0 {
+            if proto.core.sub_type == "Simple" && step %% 6 == 0 {
                 d_rand := rand.float32() 
                 if d_rand > 0.9 {
                     proto^.dir += mth.floor(rand.float32() * 4)
                 } else if d_rand < 0.1 {
                     proto^.dir -= mth.floor(rand.float32() * 4)
                 }
-                if proto^.dir < 0 {
+                if proto.dir < 0 {
                     proto^.dir += 360
-                } else if proto^.dir > 360 {
+                } else if proto.dir > 360 {
                     proto^.dir -= 360
                 }
             }
@@ -764,7 +769,7 @@ run_proto :: proc(proto:^Entity) {
 
 run_struck :: proc(struck:^Entity) {
     if struck.status == .Active {
-        switch struck^.core.sub_type {
+        switch struck.core.sub_type {
             case "brane":
             case "knot":
             case "husk":
@@ -778,15 +783,15 @@ decay_entity :: proc(ent:^Entity) {
             case .None:
             case .Chem:
             case .Ort:
-                decay_ort(ent^.pos, ent^.core.sub_type)
+                decay_ort(ent.pos, ent.core.sub_type)
             case .Snip:
-                decay_snip(ent^.pos, ent^.core.sub_type, ent^.data)
+                decay_snip(ent.pos, ent.core.sub_type, ent.data)
             case .Strand:
-                decay_strand(ent^.pos, ent^.core.sub_type, ent^.data)
+                decay_strand(ent.pos, ent.core.sub_type, ent.data)
             case .Proto:
                 //decay_proto(ent)
             case .Struck:
-                decay_struck(ent^.pos, ent^.core.sub_type)
+                decay_struck(ent.pos, ent.core.sub_type)
         }
     }
 }
@@ -837,7 +842,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
 
         o_id:string = build_id(.Ort)
         o_key:string = strings.concatenate({"ort.P"})
-        append(&entities, Entity{
+        entities[o_id] = Entity{
             id = o_id,
             core = &entity_cores[o_key],
             pos = {pos.x + x_dir, pos.y + y_dir},
@@ -855,7 +860,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
             data = "P",
             parent = "",
             owner = 0
-        })
+        }
         haze_transact(pos, "x", 2)
     } else {
         code_d:string = code
@@ -877,7 +882,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
 
             o_id:string = build_id(.Ort)
             o_key:string = strings.concatenate({"ort.", c_str})
-            append(&entities, Entity{
+            entities[o_id] = Entity{
                 id = o_id,
                 core = &entity_cores[o_key],
                 pos = {pos.x + x_dir, pos.y + y_dir},
@@ -895,7 +900,7 @@ decay_snip :: proc(pos:rl.Vector2, sub_type:string, code:string) {
                 data = c_str,
                 parent = "",
                 owner = 0
-            })
+            }
 
             n_dir += (360 / f32(len(code)))
             n_dir = f32(int(n_dir) %% 360)
