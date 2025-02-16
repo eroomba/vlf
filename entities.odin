@@ -11,16 +11,17 @@ import "core:math/rand"
 entity_cores := make(map[string]Entity_Core)
 
 chem_types := []string{"na","a1","a2","b1","b2","g1","g2","d1","d2","u1","u2","x","o1","o2","o3","v"}
+chem_count := len(chem_types)
 
 // quick function to get index of an array
 // based on chem type string
 chmi :: proc(t:string) -> int {
     for i := 0; i < len(chem_types); i += 1 {
         if chem_types[i] == t {
-            return i;
+            return i
         }
     }
-    return 0;
+    return 0
 }
 
 chem_name :: proc(t:string) -> string {
@@ -289,8 +290,8 @@ run_ort :: proc(ort:^Entity) {
                 g_count := haze_query(ort, {"g1","g2"})
                 if len(g_count) > 0 && rand.float32() > 0.999 {
                     ort^.status = .Inactive
-                    g_count[0]^.nodes[chmi("g1")] -= 1
-                    g_count[0]^.nodes[chmi("g2")] -= 1
+                    haze_transact(ort.pos, "g1", -1)
+                    haze_transact(ort.pos, "g2", -1)
 
                     sn_key := "snip.ex"
                     sn_pos := ort.pos

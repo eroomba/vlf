@@ -12,11 +12,6 @@ haze_rows:f32 = 9
 haze_w:f32 = active_width / haze_cols
 haze_h:f32 = active_height / haze_rows
 
-Haze_Node :: struct {
-    pos:rl.Vector2,
-    nodes:[16]int
-}
-
 Haze_Formula :: struct {
     part1:int,
     part2:int,
@@ -24,7 +19,25 @@ Haze_Formula :: struct {
     result_sub_type:string
 }
 
-haze := make([dynamic]Haze_Node)
+haze := make([dynamic][16]int)
+haze_saturation := []int{
+    0, // n/a
+    30, // a1
+    30, // a2
+    30, // b1
+    30, // b2
+    30, // g1
+    30, // g2
+    50, // d1
+    50, // d2
+    40, // u1
+    40, // u2
+    50, // x
+    120, // o1
+    140, // o2
+    140, // o3
+    50, // v
+}
 
 haze_formulas := []Haze_Formula{
     Haze_Formula{ part1 = chmi("a1"), part2 = chmi("a2"), result_type = .Ort, result_sub_type = "A"},
@@ -43,19 +56,18 @@ init_haze :: proc() {
         for i := 0; i < int(haze_cols); i += 1 {
             hx := f32(i) * haze_w
             hy := f32(j) * haze_h
-            append(&haze, Haze_Node{
-                pos = { hx, hy }
-            })
+            val:[16]int = 0
+            append(&haze, val)
             curr_idx := len(haze) - 1
             for spk in singles {
-                (&haze[curr_idx])^.nodes[chmi(spk)] = 1
+                haze[curr_idx][chmi(spk)] = 1
             }
-            (&haze[curr_idx])^.nodes[chmi("d1")] = 2 + int(rand.float32() * 3)
-            (&haze[curr_idx])^.nodes[chmi("d2")] = 2 + int(rand.float32() * 3)
-            (&haze[curr_idx])^.nodes[chmi("x")] = 2
-            (&haze[curr_idx])^.nodes[chmi("o1")] = 20 + int(rand.float32() * 41)
-            (&haze[curr_idx])^.nodes[chmi("o2")] = 20 + int(rand.float32() * 41)
-            (&haze[curr_idx])^.nodes[chmi("o3")] = 20 + int(rand.float32() * 41)
+            haze[curr_idx][chmi("d1")] = 2 + int(rand.float32() * 3)
+            haze[curr_idx][chmi("d2")] = 2 + int(rand.float32() * 3)
+            haze[curr_idx][chmi("x")] = 2
+            haze[curr_idx][chmi("o1")] = 10 + int(rand.float32() * 21)
+            haze[curr_idx][chmi("o2")] = 10 + int(rand.float32() * 21)
+            haze[curr_idx][chmi("o3")] = 10 + int(rand.float32() * 21)
         }
     }
 }
@@ -65,19 +77,25 @@ haze_end :: proc() {
 }
 
 haze_size_of :: proc() -> int {
-    return len(haze) * size_of(Haze_Node)
+    return len(haze) * size_of([16]int)
 }
 
 run_haze :: proc() {
     for i := 0; i < len(haze); i += 1 {
+        c_row:int = int(mth.floor(f32(i) / f32(haze_cols)))
+        c_col:int = i - (c_row * int(haze_cols))
         for form in haze_formulas {
-            if rand.float32() < 0.0001 && haze[i].nodes[form.part1] > 0 && haze[i].nodes[form.part2] > 0 {
-                (&haze[i])^.nodes[form.part1] -= 1
-                (&haze[i])^.nodes[form.part2] -= 1
+            if rand.float32() < 0.0001 && haze[i][form.part1] > 0 && haze[i][form.part2] > 0 {
+                haze[i][form.part1] -= 1
+                haze[i][form.part2] -= 1
                 o_sub_type_key := strings.concatenate({"ort.",form.result_sub_type})
                 
-                o_x:f32 = mth.floor(rand.float32() * haze_w) + haze[i].pos.x
-                o_y:f32 = mth.floor(rand.float32() * haze_h) + haze[i].pos.y
+                h_y:f32 = mth.floor(f32(i) / haze_cols)
+                h_x:f32 = f32(i) - (h_y * haze_cols)
+                h_y *= haze_h
+                h_x *= haze_w
+                o_x:f32 = mth.floor(rand.float32() * haze_w) + h_x
+                o_y:f32 = mth.floor(rand.float32() * haze_h) + h_y
                 o_vel:f32 = 0.5 + (rand.float32() * 2)
                 o_dir:f32 = rand.float32() * 360
 
@@ -115,11 +133,36 @@ run_haze :: proc() {
                 }
             } 
         }
+
+        for c in 0..<len(haze[i]) {
+            if haze[i][c] > haze_saturation[c] {
+
+                s_col := c_col - 1 < 0 ? 0 : c_col - 1 
+                e_col := c_col + 1 >= int(haze_cols) ? int(haze_cols) - 1 : c_col + 1
+                s_row := c_row - 1 < 0 ? 0 : c_row - 1 
+                e_row := c_row + 1 >= int(haze_rows) ? int(haze_rows) - 1 : c_row + 1
+
+                rem_amount:int = int(mth.ceil(f32(haze_saturation[c]) * 0.05))
+                if rem_amount < 2 {
+                    rem_amount = 2
+                }
+
+                for ii := s_col; ii <= e_col; ii += 1 {
+                    for jj := s_row; jj <= e_row; jj += 1 {
+                        cd_idx := (jj * int(haze_cols)) + ii
+                        if !(ii == c_col && jj == c_row) && haze[cd_idx][c] + rem_amount < haze_saturation[c] * 2 {
+                            haze[cd_idx][c] += rem_amount
+                            haze[i][c] = haze[i][c] - rem_amount < 0 ? 0 : haze[i][c] - rem_amount
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-haze_query :: proc(ent:^Entity, check_types:[]string) -> [dynamic]^Haze_Node {
-    ret_val := make([dynamic]^Haze_Node)
+haze_query :: proc(ent:^Entity, check_types:[]string) -> [dynamic][16]int {
+    ret_val := make([dynamic][16]int)
     start_c:f32 = mth.floor((ent.pos.x - ent.core.range) / haze_w)
     end_c:f32 = mth.floor((ent.pos.x + ent.core.range) / haze_w)
     start_r:f32 = mth.floor((ent.pos.y - ent.core.range) / haze_h)
@@ -154,12 +197,12 @@ haze_query :: proc(ent:^Entity, check_types:[]string) -> [dynamic]^Haze_Node {
             h_idx:int = (r * int(haze_rows) + c)
             type_count:int = 0
             for cs in check_types {
-                if haze[h_idx].nodes[chmi(cs)] > 0 {
+                if haze[h_idx][chmi(cs)] > 0 {
                     type_count += 1
                 }
             }
             if type_count == len(check_types) {
-                append(&ret_val, &haze[h_idx])
+                append(&ret_val, haze[h_idx])
             }
         }
     }
@@ -172,30 +215,39 @@ haze_query_2 :: proc(pos:rl.Vector2) -> map[string]int {
     col:f32 = mth.floor(pos.x / haze_w)
     row:f32 = mth.floor(pos.y / haze_h)
 
-    h_idx:int = int((row * haze_rows) + col)
+    h_idx:int = int((row * haze_cols) + col)
     for s : = 1; s < len(chem_types); s += 1 {
         ss:string = chem_types[s]
-        ret_val[ss] = haze[h_idx].nodes[chmi(ss)]
+        ret_val[ss] = haze[h_idx][chmi(ss)]
     }
 
     return ret_val
 }
 
 haze_transact :: proc(pos:rl.Vector2, chm_type:string, count:int) {
-    h_c:f32 = mth.floor(pos.x / haze_w)
     h_r:f32 = mth.floor(pos.y / haze_h)
-    if h_c < 0 {
-        h_c = 0
-    } else if h_c >= haze_cols {
-        h_c = haze_cols - 1
-    }
-    if h_r < 0 {
+    h_c:f32 = mth.floor(pos.x / haze_w)
+    if (h_r < 0) {
         h_r = 0
     } else if h_r >= haze_rows {
         h_r = haze_rows - 1
     }
-    h_idx:f32 = (h_r * haze_cols) + h_c
-    if chmi(chm_type) < len(chem_types) {
-        haze[int(h_idx)].nodes[chmi(chm_type)] += count
+    if (h_c < 0) {
+        h_c = 0
+    } else if h_c >= haze_cols {
+        h_c = haze_cols - 1
+    }
+
+    h_idx:int = int((h_r * haze_cols) + h_c)
+    c_idx:int = chmi(chm_type)
+
+    if c_idx < len(chem_types) && c_idx >= 0 {
+        if haze[h_idx][c_idx] + count > haze_saturation[c_idx] * 2 {
+            haze[h_idx][c_idx] = haze_saturation[c_idx] * 2
+        } else if haze[h_idx][c_idx] + count < 0 {
+            haze[h_idx][c_idx] = 0
+        } else {
+            haze[h_idx][c_idx] += count
+        }
     }
 }

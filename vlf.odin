@@ -38,7 +38,7 @@ Event :: struct {
     pos:rl.Vector2
 }
 
-run_test:bool = true
+test_mode:string = ""
 show_debug:bool = false
 set_flags:bit_set[Flags]
 events := make([dynamic]Event)
@@ -52,21 +52,25 @@ vlf_init :: proc() {
 
     init_graphics()
 
+    init_players()
+
     init_cores()
 
     init_haze()
 
-    if run_test {
-        vlf_test_init("strand1")
+    if len(test_mode) > 0 {
+        vlf_test_init(test_mode)
     }
 
     init_hash()
+
+    init_environment()
 
     sys_player := add_player("System", 0, {0,0,0,0}, {0, 0})
     players[sys_player].status = .Inactive
     active_player = add_player("Player 1", 1, {100,245,100,255}, {active_width / 2, active_height})
 
-    if len(players) - 1 == 1{
+    if len(players) - 1 >= 2 {
         max_reach = active_width * 0.49
     }
 
@@ -281,6 +285,74 @@ vlf_test_init :: proc(ver:string) {
                 owner = 0
             }
     }
+}
+
+init_environment :: proc() {
+    q1:rl.Vector2 = { 0, 0 }
+    q2:rl.Vector2 = { 0, 0 }
+    r_set:int = int(mth.floor(rand.float32() * 4))
+
+    switch r_set {
+        case 0:
+            q1.x = 0
+            q1.y = 0
+            q2.x = active_width * 0.5
+            q2.y = active_height * 0.5
+        case 1:
+            q1.x = active_width * 0.5
+            q1.y = 0
+            q2.x = 0
+            q2.y = active_height * 0.5
+        case 2:
+            q1.x = 0
+            q1.y = active_height * 0.5
+            q2.x = active_width * 0.5
+            q2.y = 0
+        case 3:
+            q1.x = active_width * 0.5
+            q1.y = active_height * 0.5
+            q2.x = 0
+            q2.y = 0
+    }
+
+    p1_pos:rl.Vector2 = { q1.x + mth.floor(rand.float32() * active_width * 0.5), q1.y + mth.floor(rand.float32() * active_height * 0.5) }
+    p2_pos:rl.Vector2 = { q2.x + mth.floor(rand.float32() * active_width * 0.5), q2.y + mth.floor(rand.float32() * active_height * 0.5) }
+
+    p1_pos.x = (mth.floor(p1_pos.x / haze_w) * haze_w) + (haze_w * 0.5)
+    p1_pos.y = (mth.floor(p1_pos.y / haze_h) * haze_h) + (haze_h * 0.5)
+
+    p2_pos.x = (mth.floor(p2_pos.x / haze_w) * haze_w) + (haze_w * 0.5)
+    p2_pos.y = (mth.floor(p2_pos.y / haze_h) * haze_h) + (haze_h * 0.5)
+
+    p_id1:string = "capsule-001"
+    p_vars1 := make(map[string]string)
+    p_vars1["hover_text"] = "Slow Release Capsule x-28"
+    append(&items, Item{
+        id = p_id1,
+        i_type = .Capsule,
+        status = .Active,
+        pos = p1_pos,
+        vel = { 0, rand.float32() * 360 },
+        level = 0,
+        num_vars = make(map[string]f32),
+        str_vars = p_vars1,
+        owner = 0
+    })
+
+    p_id2:string = "capsule-002"
+    p_vars2 := make(map[string]string)
+    p_vars2["hover_text"] = "Slow Release Capsule x-92"
+    append(&items, Item{
+        id = p_id2,
+        i_type = .Capsule,
+        status = .Active,
+        pos = p2_pos,
+        vel = { 0, rand.float32() * 360 },
+        level = 0,
+        num_vars = make(map[string]f32),
+        str_vars = p_vars2,
+        owner = 0
+    })
 }
 
 info_click :: proc(pos:rl.Vector2) {

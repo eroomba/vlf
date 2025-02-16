@@ -12,10 +12,21 @@ Graphics_Params :: struct {
 	color:rl.Color
 }
 
-src_images:[9]rl.Image
-textures:[12]rl.Texture2D
+Hover_Params :: struct {
+	text:string,
+	pos:rl.Vector2,
+	active:bool
+}
+
+src_images:[10]rl.Image
+textures:[14]rl.Texture2D
 font:rl.Font
 main_filter:rl.TextureFilter
+hover_params := Hover_Params{
+	text = "",
+	pos = { -100, -100 },
+	active = false
+}
 
 t_bg_idx := -1
 t_env_idx := -1
@@ -30,6 +41,7 @@ t_proto_draw_idx := -1
 t_struck_idx := -1
 t_item_idx := -1
 t_tool_idx := -1
+t_hover_idx := -1
 
 i_ort_idx := -1
 i_snip_idx := -1
@@ -43,25 +55,40 @@ vlf_draw :: proc() {
 
     rl.DrawTexture(textures[t_bg_idx], i32(-1 * active_width / 2), i32(-1 * active_height / 2), rl.WHITE)
 
+	hover_params.active = false
+	hover_params.text = ""
+	hover_params.pos = { -100, -100 }
+
+	for &item in items {
+		if item.level == 0 {
+			draw_item(&item)
+		}
+	}
+
 	for ent in entities {
 		if entities[ent].status == .Active {
 			draw_entity(&entities[ent])
 		}
 	}
 
-	if .Shift in set_flags {
-		draw_environment()
-	}
 
 	if len(info_item) > 0 && info_item in entities && entities[info_item].status == .Active && info_item_timer > 0 {
 		draw_info()
 	}
 
 	for &item in items {
-		draw_item(&item)
+		if item.level > 0 {
+			draw_item(&item)
+		}
 	}
 
 	draw_player()
+
+	if .Shift in set_flags {
+		draw_env_disp()
+	} else if len(hover_params.text) > 0 && hover_params.active {
+		draw_hover()
+	}
 }
 
 draw_entity :: proc(ent:^Entity) {
@@ -369,10 +396,31 @@ draw_item :: proc(item:^Item) {
 				p_pos := item.pos
 
 				p_rad:f32 = player_tool_rad + f32(step * 5)
-				//p_alpha := u8(240 * (1 - (step / 5))) 
 				p_alpha:u8 = u8(240 - (((8 - u8(step)) / 8) * 200))
 				rl.DrawCircleLinesV(p_pos, p_rad, {180, 180, 255, p_alpha})
-		}
+			case .Capsule:
+				capsule_ow:f32 = 200
+				capsule_oh:f32 = 100
+
+				capsule_tw:f32 = active_width * 0.025
+				capsule_th:f32 = (capsule_oh / capsule_ow) * capsule_tw
+
+				capsule_origin:rl.Vector2 = { capsule_tw * 0.5, capsule_th * 0.5}
+				capsule_rot:f32 = item.vel.y
+
+				capsule_tint:rl.Color = { 100, 255, 255, 100 }
+
+				rl.DrawTexturePro(textures[t_item_idx], { 0, 0, capsule_ow, capsule_oh }, {item.pos.x, item.pos.y, capsule_tw, capsule_th }, capsule_origin, capsule_rot, capsule_tint)
+
+				if 	mouse_pos.x >= item.pos.x - (capsule_tw * 0.5) && mouse_pos.x <= item.pos.x + (capsule_tw * 0.5) &&
+				mouse_pos.y >= item.pos.y - (capsule_th * 0.5) && mouse_pos.y <= item.pos.y + (capsule_th * 0.5) &&
+				"hover_text" in item.str_vars {
+					hover_params.text = item.str_vars["hover_text"]
+					hover_params.active = true
+					hover_params.pos = { item.pos.x, item.pos.y - (capsule_th * 0.5)}
+				}
+		}	
+		
 	}
 }
 
@@ -569,7 +617,46 @@ draw_info :: proc() {
 	}
 }
 
-draw_environment :: proc() {
+draw_hover :: proc() {
+	if hover_params.active && len(hover_params.text) > 0 {
+		font_size:i32 = 15
+		h_size := rl.MeasureTextEx(font, strings.clone_to_cstring(hover_params.text), f32(font_size), 0)
+		padding:i32 = 5
+		hover_w := i32(h_size.x) + (2 * padding)
+		hover_h := i32(h_size.y) + (2 * padding)
+
+		hover := rl.GenImageColor(i32(hover_w), i32(hover_h), {255,255,255,0})
+		round_r:i32 = 5
+		hover_bg:rl.Color = { 255, 255, 255, 100 }
+		rl.ImageDrawCircle(&hover, round_r, round_r, round_r, hover_bg)
+		rl.ImageDrawCircle(&hover, hover_w - round_r, round_r, round_r, hover_bg)
+		rl.ImageDrawCircle(&hover, hover_w - round_r, hover_h - round_r, round_r, hover_bg)
+		rl.ImageDrawCircle(&hover, round_r, hover_h - round_r, round_r, hover_bg)
+		rl.ImageDrawRectangle(&hover, round_r, 0, hover_w - (2 * round_r), hover_h,  hover_bg)
+		rl.ImageDrawRectangle(&hover, 0, round_r, hover_w, hover_h - (2 * round_r), hover_bg)
+
+		text_color:rl.Color = { 30, 30, 30, 200 }
+
+		rl.ImageDrawTextEx(&hover, font, strings.clone_to_cstring(hover_params.text), { f32(padding), f32(padding) }, f32(font_size), 0, text_color)
+
+		textures[t_hover_idx] = rl.LoadTextureFromImage(hover)
+		rl.GenTextureMipmaps(&textures[t_hover_idx])
+		rl.SetTextureFilter(textures[t_hover_idx], main_filter)
+		rl.UnloadImage(hover)
+
+		hover_a:f32 = 200
+		hover_x:f32 = hover_params.pos.x
+		hover_y:f32 = hover_params.pos.y
+		if hover_params.pos.x < 0 && hover_params.pos.y < 0 {
+			hover_x = mouse_pos.x 
+			hover_y = mouse_pos.y
+		}
+
+		rl.DrawTexturePro(textures[t_hover_idx], {0, 0, f32(hover_w), f32(hover_h)}, {hover_x, hover_y - 10, f32(hover_w), f32(hover_h)}, { f32(hover_w) * 0.5, f32(hover_h) }, 0, { 255, 255, 255, u8(hover_a)})
+	}
+}
+
+draw_env_disp :: proc() {
 	buf:[64]u8
 	counts := haze_query_2(mouse_pos)
 
@@ -702,6 +789,13 @@ init_graphics :: proc() {
 	t_tool_idx = t_idx
 	t_idx += 1
 
+	hover_draw := rl.LoadTextureFromImage(x_img)
+	rl.GenTextureMipmaps(&hover_draw)
+	rl.SetTextureFilter(hover_draw, main_filter)
+	textures[t_idx] = hover_draw
+	t_hover_idx = t_idx
+	t_idx += 1
+
 	rl.UnloadImage(x_img)
 
 	img_loader:[]u8
@@ -721,7 +815,6 @@ init_graphics :: proc() {
 	i_ort_idx = i_idx
 	i_idx += 1
 	
-
 	img_loader = #load("./images/snips.png")
 	data_size = i32(len(img_loader))
 	snips_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
@@ -790,6 +883,20 @@ init_graphics :: proc() {
 	t_struck_idx = t_idx
 	t_idx += 1
 	i_struck_idx = i_idx
+	i_idx += 1
+
+	img_loader = #load("./images/items.png")
+	data_size = i32(len(img_loader))
+	items_img := rl.LoadImageFromMemory(".png",&img_loader[0],data_size)
+	img_loader = []u8{}
+	items := rl.LoadTextureFromImage(items_img)
+	rl.GenTextureMipmaps(&items)
+	rl.SetTextureFilter(items, main_filter)
+	textures[t_idx] = items
+	src_images[i_idx] = items_img
+	t_item_idx = t_idx
+	t_idx += 1
+	i_item_idx = i_idx
 	i_idx += 1
 }
 

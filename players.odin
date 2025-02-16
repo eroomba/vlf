@@ -55,7 +55,7 @@ max_reach:f32 = mth.floor(active_height * 0.5)
 player_dir_delta:f32 = mth.ceil(0.002 * active_height)
 player_reach_delta:f32 = mth.ceil(0.005 * active_height)
 
-start :: proc() {
+init_players :: proc() {
     add_player("System",0,{245,245,245,255}, { -100, -100 })
 }
 
@@ -174,6 +174,7 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                             status = .Active,
                             pos = p_pos,
                             vel = { 0, 0 },
+                            level = 1,
                             num_vars = n_vars,
                             str_vars = make(map[string]string),
                             owner = player.num
