@@ -9,8 +9,8 @@ import "core:math/rand"
 
 haze_cols:f32 = 16
 haze_rows:f32 = 9
-haze_w:f32 = active_width / haze_cols
-haze_h:f32 = active_height / haze_rows
+haze_w:f32 = active_width  / haze_cols
+haze_h:f32 = active_height  / haze_rows
 
 Haze_Formula :: struct {
     part1:int,
@@ -161,51 +161,22 @@ run_haze :: proc() {
     }
 }
 
-haze_query :: proc(ent:^Entity, check_types:[]string) -> [dynamic][16]int {
-    ret_val := make([dynamic][16]int)
-    start_c:f32 = mth.floor((ent.pos.x - ent.core.range) / haze_w)
-    end_c:f32 = mth.floor((ent.pos.x + ent.core.range) / haze_w)
-    start_r:f32 = mth.floor((ent.pos.y - ent.core.range) / haze_h)
-    end_r:f32 = mth.floor((ent.pos.y + ent.core.range) / haze_h)
+haze_query :: proc(ent:^Entity, check_types:[]string) -> [16]int {
+    ret_val:[16]int
+    h_c:f32 = mth.floor(ent.pos.x / haze_w)
+    h_r:f32 = mth.floor(ent.pos.y / haze_h)
 
-    if start_c < 0 {
-        start_c = 0
-    } else if start_c >= haze_cols {
-        start_c = haze_cols
-    }
-
-    if end_c < 0 {
-        end_c = 0
-    } else if end_c >= haze_cols {
-        end_c = haze_cols
-    }
-
-    if start_r < 0 {
-        start_r = 0
-    } else if start_r >= haze_rows {
-        start_r = haze_rows
-    }
-
-    if end_r < 0 {
-        end_r = 0
-    } else if end_r >= haze_rows {
-        end_r = haze_rows
-    }
-
-    for r:int = int(start_r); r <= int(end_r); r += 1 {
-        for c:int = int(start_c); c <= int(end_c); c += 1 {
-            h_idx:int = (r * int(haze_rows) + c)
-            type_count:int = 0
-            for cs in check_types {
-                if haze[h_idx][chmi(cs)] > 0 {
-                    type_count += 1
-                }
-            }
-            if type_count == len(check_types) {
-                append(&ret_val, haze[h_idx])
-            }
+    h_idx:int = (int(h_r) * int(haze_cols)) + int(h_c)
+    type_count:int = 0
+    for cs in check_types {
+        if haze[h_idx][chmi(cs)] > 0 {
+            type_count += 1
         }
     }
+    if type_count == len(check_types) {
+        return haze[h_idx]
+    }
+
     return ret_val
 }
 
@@ -214,6 +185,18 @@ haze_query_2 :: proc(pos:rl.Vector2) -> map[string]int {
 
     col:f32 = mth.floor(pos.x / haze_w)
     row:f32 = mth.floor(pos.y / haze_h)
+
+    if col < 0 {
+        col = 0
+    } else if col >= haze_cols {
+        col = haze_cols - 1
+    }
+
+    if row < 0 {
+        row = 0
+    } else if row >= haze_rows {
+        row = haze_rows - 1
+    }
 
     h_idx:int = int((row * haze_cols) + col)
     for s : = 1; s < len(chem_types); s += 1 {

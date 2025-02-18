@@ -9,6 +9,7 @@ import rl "vendor:raylib"
 import "core:math/rand"
 
 step:int = 0
+step_delta:int = 0
 id_seed:int = 0
 visc:f32 : 0.3
 entities := make(map[string]Entity)
@@ -38,7 +39,7 @@ Event :: struct {
     pos:rl.Vector2
 }
 
-test_mode:string = ""
+test_mode:string = "proto1"
 show_debug:bool = false
 set_flags:bit_set[Flags]
 events := make([dynamic]Event)
@@ -80,9 +81,12 @@ vlf_init :: proc() {
 
 }
 
-vlf_run :: proc() {
-
+vlf_run_step :: proc() {
     step += 1
+}
+
+vlf_run_frame :: proc() {
+
     if info_item_timer > 0 {
         info_item_timer -= 1
     } else if info_item_timer == 0 {
@@ -226,7 +230,7 @@ vlf_test_init :: proc(ver:string) {
                 complexity = 1,
                 num_vars = pro_nvars,
                 str_vars = make(map[string]string),
-                data = "ABDACB",
+                data = "ABDACBCABAC",
                 parent = "",
                 owner = 0
             }
@@ -253,7 +257,7 @@ vlf_test_init :: proc(ver:string) {
                 complexity = 2,
                 num_vars = make(map[string]f32),
                 str_vars = make(map[string]string),
-                data = "",
+                data = "ABDACBCABAC",
                 parent = "",
                 owner = 0
             }

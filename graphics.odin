@@ -100,14 +100,14 @@ draw_entity :: proc(ent:^Entity) {
 			if ent.decay <= 10 {
 				o_params.color[3] = u8(f32(o_params.color[3]) * (f32(ent.decay) / 10))
 			}
-			ort_thw:f32 = mth.floor(screen_height * 0.013)
+			ort_thw:f32 = mth.floor(screen_height * 0.010)
 			rl.DrawTexturePro(textures[t_ort_idx], o_params.rect, {ent.pos.x, ent.pos.y, ort_thw, ort_thw }, {ort_thw / 2, ort_thw / 2}, ent.vel.y, o_params.color)
 		case .Snip:
 			sn_params := item_draw_params(ent)
 			if ent.decay <= 10 {
 				sn_params.color[3] = u8(f32(sn_params.color[3]) * (f32(ent.decay) / 10))
 			}
-			snip_th:f32 = mth.floor(screen_height * 0.015)
+			snip_th:f32 = mth.floor(screen_height * 0.012)
 			snip_tw:f32 = (sn_params.rect.width / sn_params.rect.height) * snip_th
 			rl.DrawTexturePro(textures[t_snip_idx], sn_params.rect, {ent.pos.x, ent.pos.y, snip_tw, snip_th }, {snip_tw / 2, snip_th / 2}, ent.vel.y, sn_params.color)
 		case .Strand:
@@ -115,33 +115,53 @@ draw_entity :: proc(ent:^Entity) {
 			if ent.decay <= 10 {
 				st_params.color[3] = u8(f32(st_params.color[3]) * (f32(ent.decay) / 10))
 			}
-			strand_th:f32 = mth.floor(screen_height * 0.017)
+			strand_th:f32 = mth.floor(screen_height * 0.015)
 			strand_tw:f32 = (st_params.rect.width / st_params.rect.height) * strand_th
 			rl.DrawTexturePro(textures[t_strand_idx], st_params.rect, {ent.pos.x, ent.pos.y, strand_tw, strand_th }, {strand_tw / 2, strand_th / 2}, ent.vel.y, st_params.color)
 		case .Proto:
 			pr_params := item_draw_params(ent)
+			pr_types := check_type(ent.data)
+
 			if ent.life <= 10 {
 				pr_params.color[3] = u8(f32(pr_params.color[3]) * (f32(ent.life) / 10))
 			}
 			proto_rot := ent.dir
-			proto_th:f32 = mth.floor(screen_height * 0.032)
+			proto_th:f32 = mth.floor(screen_height * 0.04)
 			proto_tw:f32 = (pr_params.rect.width / pr_params.rect.height) * proto_th
 			proto_origin:rl.Vector2 = {proto_tw / 2, proto_th / 2}
 
-			pr_img:rl.Image = rl.GenImageColor(i32(proto_tw) * 2, i32(proto_th), {255, 255, 255, 0});
-			rl.ImageDraw(&pr_img, src_images[i_proto_idx], pr_params.rect, { 0, 0, proto_tw, proto_th}, rl.WHITE)
+			pr_alpha:rl.Color = { 255, 255, 255, pr_params.color[3] }
 
-			pr_types := check_type(ent.data)
-
-			skin_color:rl.Color = { 255, 255, 255, 255 }
 			has_skin:bool = false
+
+			pr_img:rl.Image = rl.GenImageColor(i32(proto_tw) * 2, i32(proto_th), {255, 255, 255, 0});
+		
+			rl.ImageDraw(&pr_img, src_images[i_proto_idx], pr_params.rect, { 0, 0, proto_tw, proto_th}, pr_params.color)
+
 			if .Chem in pr_types {
-				skin_color = { 100, 255, 100, 255 }
+				ch_color_x:rl.Vector4 = { 255, 0, 128, 0}
+				sk_color:rl.Vector4 = {f32(pr_params.color[0]), f32(pr_params.color[1]), f32(pr_params.color[2]), 0}
+				diff_color := sk_color - ch_color_x			
+
+
+				if ent.num_vars["chem_i"] != 0 {
+					if ent.num_vars["chem_i"] > 1 {
+						diff_color *= 2 - ent.num_vars["chem_i"]
+					} else {
+						diff_color *= ent.num_vars["chem_i"]
+					} 
+				}
+				sk_color -= diff_color
+				ch_color:rl.Color = { u8(sk_color[0]), u8(sk_color[1]), u8(sk_color[2]), 255}
+				ch_rect := pr_params.rect
+				ch_rect.y = 800
+				rl.ImageDraw(&pr_img, src_images[i_proto_idx], ch_rect, { 0, 0, proto_tw, proto_th}, ch_color)
 			}
+
 			if .Breathe in pr_types {
 				br_rect := pr_params.rect
 				br_rect.y = 600
-				rl.ImageDraw(&pr_img, src_images[i_proto_idx], br_rect, { 0, 0, proto_tw, proto_th}, skin_color)
+				rl.ImageDraw(&pr_img, src_images[i_proto_idx], br_rect, { 0, 0, proto_tw, proto_th}, pr_params.color)
 				has_skin = true
 			}
 			
@@ -150,7 +170,13 @@ draw_entity :: proc(ent:^Entity) {
 					if .Move in pr_types {
 						mv_rect := pr_params.rect
 						mv_rect.y = 400
-						rl.ImageDraw(&pr_img, src_images[i_proto_idx], mv_rect, { 0, 0, proto_tw, proto_th}, skin_color)
+
+						if step %% 10 < 4 {
+							mv_rect.x = 0
+						}
+
+						rl.ImageDraw(&pr_img, src_images[i_proto_idx], mv_rect, { 0, 0, proto_tw, proto_th}, pr_params.color)
+
 						has_skin = true
 					}		
 				case "Complex":
@@ -183,17 +209,25 @@ draw_entity :: proc(ent:^Entity) {
 							rl.ImageDrawLineEx(&t_img, t_pt, t_pt2, 6, t_color)
 							t_pt = t_pt2
 						}
-						rl.ImageDraw(&pr_img, t_img, { 0, 0, t_ow, t_oh }, { proto_tw * 0.89, proto_th * 0.25, proto_tw, proto_th / 2}, skin_color)
+						rl.ImageDraw(&pr_img, t_img, { 0, 0, t_ow, t_oh }, { proto_tw * 0.89, proto_th * 0.25, proto_tw, proto_th / 2}, pr_params.color)
 						rl.UnloadImage(t_img)
 					}
 			}	
+
+			if .Breathe in pr_types {
+				br_rect2 := pr_params.rect
+				br_alpha:u8 = u8(f32(255) * ent.num_vars["breath_i"])
+				br_color2:rl.Color = { 255, 255, 255, br_alpha }
+				br_rect2.y = 1000
+				rl.ImageDraw(&pr_img, src_images[i_proto_idx], br_rect2, { 0, 0, proto_tw, proto_th}, br_color2)
+			}
 
 			textures[t_proto_draw_idx] = rl.LoadTextureFromImage(pr_img)
 			rl.UnloadImage(pr_img)		
 			
 			rl.GenTextureMipmaps(&textures[t_proto_draw_idx])
 			rl.SetTextureFilter(textures[t_proto_draw_idx], main_filter)
-			rl.DrawTexturePro(textures[t_proto_draw_idx], { 0, 0, proto_tw * 2, proto_th }, {ent.pos.x, ent.pos.y, proto_tw * 2, proto_th }, proto_origin, proto_rot, pr_params.color)
+			rl.DrawTexturePro(textures[t_proto_draw_idx], { 0, 0, proto_tw * 2, proto_th }, {ent.pos.x, ent.pos.y, proto_tw * 2, proto_th }, proto_origin, proto_rot, pr_alpha)
 		case .Struck:
 			stk_params := item_draw_params(ent)
 			if ent.decay <= 10 {
@@ -272,7 +306,10 @@ draw_player :: proc() {
 
 		font_size:i32 = 16
 		line_spacing:i32 = 3
-		player_text := []string{ "MICRO-TOOL: ", "Status: ", "[E to switch tool, SPACE to activate]" }
+		player_text := make([dynamic]string)
+		append(&player_text, "MICRO-TOOL: ")
+		append(&player_text, "Status: ")
+		append(&player_text, "[E to switch tool, SPACE to activate]")
 		switch players[active_player].tool {
 			case .None:
 				player_text[0] = strings.concatenate({player_text[0], "n/a"})
@@ -286,6 +323,13 @@ draw_player :: proc() {
 				} else {
 					player_text[1] = strings.concatenate({player_text[1], "Ready"})
 				}
+
+				append(&player_text, ">Release: If the player has")
+				append(&player_text, ">s-branes available and loaded")
+				append(&player_text, ">this tool allows them to")
+				append(&player_text, ">drop the s-brane in place")
+				append(&player_text, ">when activated.")
+				
 			case .Pulse:
 				player_text[0] = strings.concatenate({player_text[0], "Pulse"})
 				if players[active_player].num_vars["tool_timer"] > 0 {
@@ -293,6 +337,11 @@ draw_player :: proc() {
 				} else {
 					player_text[1] = strings.concatenate({player_text[1], "Ready"})
 				}
+
+				append(&player_text, ">Pulse: Send out a wave that")
+				append(&player_text, ">pushes small, unanchored")
+				append(&player_text, ">elements away")
+
 			case .Grab:
 				player_text[0] = strings.concatenate({player_text[0], "Retrieval"})
 				player_text[1] = strings.concatenate({player_text[1], "Not yet implemented"})
@@ -301,21 +350,31 @@ draw_player :: proc() {
 				//} else {
 				//	player_text[1] = strings.concatenate({player_text[1], "Ready"})
 				//}
+
+				append(&player_text, ">Retrieval [not yet implemented]:")
+				append(&player_text, ">pulls proto into inventory")
+
 		}
 
 		text_h:f32 = 0
 		text_w:f32 = 0
 		for l in 0..<len(player_text) {
 			f_size := font_size
+			l_spacing := line_spacing
+			m_string := strings.concatenate({player_text[l]})
 			if player_text[l][0] == '[' {
 				f_size = i32(f32(font_size) * 0.75)
+			} else if player_text[l][0] == '>' {
+				f_size = i32(f32(font_size) * 0.75)
+				l_spacing = 0
+				m_string = strings.concatenate({"  ", m_string[1:len(m_string)], "  "})
 			}
-			text_size := rl.MeasureTextEx(font, strings.clone_to_cstring(player_text[l]), f32(f_size), 0)
+			text_size := rl.MeasureTextEx(font, strings.clone_to_cstring(m_string), f32(f_size), 0)
 			if text_size.x > text_w {
 				text_w = f32(text_size.x)
 			}
 			text_h += f32(f_size)
-			text_h += l > 0 ? f32(line_spacing) : 0
+			text_h += l > 0 ? f32(l_spacing) : 0
 		}
 		
 		padding:f32 = mth.ceil(active_height * 0.01)
@@ -340,12 +399,18 @@ draw_player :: proc() {
 
 		for l in 0..<len(player_text) {
 			f_size := font_size
+			l_spacing := line_spacing
+			m_string := strings.concatenate({player_text[l]})
 			if player_text[l][0] == '[' {
 				f_size = i32(f32(font_size) * 0.75)
+			} else if player_text[l][0] == '>' {
+				f_size = i32(f32(font_size) * 0.75)
+				l_spacing = 0
+				m_string = strings.concatenate({"  ", m_string[1:len(m_string)], "  "})
 			}
-			rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(player_text[l]), { padding, curr_y }, f32(f_size), 0, { 30, 30, 30, 255 })
+			rl.ImageDrawTextEx(&p_det, font, strings.clone_to_cstring(m_string), { padding, curr_y }, f32(f_size), 0, { 30, 30, 30, 255 })
 			curr_y += f32(f_size)
-			curr_y += l > 0 ? f32(line_spacing) : 0
+			curr_y += l > 0 ? f32(l_spacing) : 0
 		}
 
 		curr_y += padding
@@ -1028,9 +1093,9 @@ item_draw_params :: proc(ent:^Entity) -> Graphics_Params {
 			switch ent.core.sub_type {
 				case "Simple":
 					offset_x = 300
-					ret_color = { 80, 255, 80, pr_alpha}
+					ret_color = { 0, 255, 127, pr_alpha }
 				case "Complex":
-					ret_color = { 20, 255, 255, pr_alpha}
+					ret_color = { 0, 191, 255, pr_alpha }
 			}
 
 			proto_ow:f32 = 300

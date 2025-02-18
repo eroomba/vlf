@@ -2,6 +2,7 @@ package vlf
 
 import "core:fmt"
 import "core:unicode/utf8"
+import "core:slice"
 import mem "core:mem"
 import "core:strings"
 import mth "core:math"
@@ -223,6 +224,9 @@ init_cores :: proc() {
 }
 
 run_entity :: proc(ent:^Entity) {
+    if step_delta > 0 {
+        ent^.age += 1
+    }
     if ent.status == .Active {
         switch ent.core.e_type {
             case .None:
@@ -281,7 +285,9 @@ run_entity :: proc(ent:^Entity) {
 
 run_ort :: proc(ort:^Entity) {
     if ort.status == .Active {
-        ort.decay -= 1
+        if step_delta > 0 {
+            ort.decay -= 1
+        }
         if (ort.decay <= 0) {
             ort^.status = .Inactive
             decay_entity(ort)
@@ -412,7 +418,9 @@ run_ort :: proc(ort:^Entity) {
 
 run_snip :: proc(snip:^Entity) {
     if snip.status == .Active {
-        snip^.decay -= 1
+        if step_delta > 0 {
+            snip^.decay -= 1
+        } 
         if (snip.decay <= 0) {
             snip^.status = .Inactive
             decay_entity(snip)
@@ -658,7 +666,9 @@ run_snip :: proc(snip:^Entity) {
 run_strand :: proc(strand:^Entity) {
     
     if strand.status == .Active {
-        strand^.decay -= 1
+        if step_delta > 0 {
+            strand^.decay -= 1
+        } 
         if strand.decay <= 0 {
             strand^.status = .Inactive
             decay_entity(strand)
@@ -691,6 +701,13 @@ run_strand :: proc(strand:^Entity) {
                 pro_id := build_id(.Proto)
                 pro_key:string = "proto.Simple"
                 pro_data:string = strand.data
+
+                for i in 2..<len(strand.data) {
+                    if slice.contains(complexity_codes[:], strand.data[i-2:i]) {
+                        pro_key = "proto.Complex"
+                        break
+                    }
+                }
 
                 pro_pos := strand.pos
                 pro_vel := strand.vel
@@ -735,7 +752,7 @@ run_strand :: proc(strand:^Entity) {
 
 run_proto :: proc(proto:^Entity) {
     if proto.status == .Active {
-        if step %% 24 == 0 {
+        if proto.age %% 6 == 0 {
             proto^.life -= 1
         }
         if proto.life <= 0 {
@@ -770,6 +787,9 @@ run_proto :: proc(proto:^Entity) {
 
 run_struck :: proc(struck:^Entity) {
     if struck.status == .Active {
+        if step_delta > 0 {
+            struck^.decay -= 1
+        }
         switch struck.core.sub_type {
             case "brane":
             case "knot":
