@@ -9,9 +9,10 @@ import rl "vendor:raylib"
 import "core:math/rand"
 
 step:int = 0
+step_delta:int = 0
 id_seed:int = 0
 visc:f32 : 0.3
-entities := make([dynamic]Entity)
+entities := make(map[string]Entity)
 
 Flags :: enum {
     Shift,
@@ -38,13 +39,13 @@ Event :: struct {
     pos:rl.Vector2
 }
 
-run_test:bool = true
+test_mode:string = "proto1"
 show_debug:bool = false
 set_flags:bit_set[Flags]
 events := make([dynamic]Event)
 mouse_pos:rl.Vector2 = { 0, 0 }
 
-info_item:^Entity = nil
+info_item:string = ""
 info_item_timer:int = 0
 
 
@@ -52,21 +53,25 @@ vlf_init :: proc() {
 
     init_graphics()
 
+    init_players()
+
     init_cores()
 
     init_haze()
 
-    if run_test {
-        vlf_test_init("proto1")
+    if len(test_mode) > 0 {
+        vlf_test_init(test_mode)
     }
 
     init_hash()
+
+    init_environment()
 
     sys_player := add_player("System", 0, {0,0,0,0}, {0, 0})
     players[sys_player].status = .Inactive
     active_player = add_player("Player 1", 1, {100,245,100,255}, {active_width / 2, active_height})
 
-    if len(players) - 1 == 1{
+    if len(players) - 1 >= 2 {
         max_reach = active_width * 0.49
     }
 
@@ -76,13 +81,16 @@ vlf_init :: proc() {
 
 }
 
-vlf_run :: proc() {
-
+vlf_run_step :: proc() {
     step += 1
+}
+
+vlf_run_frame :: proc() {
+
     if info_item_timer > 0 {
         info_item_timer -= 1
     } else if info_item_timer == 0 {
-        info_item = nil
+        info_item = ""
     }
 
     if .Left in set_flags && active_player >= 0 {
@@ -107,11 +115,9 @@ vlf_run :: proc() {
 
     run_events()
 
-    e := len(entities)
-    for i in 0..<e {
-        ent := &entities[i]
-		if ent.status == .Active {
-			run_entity(ent)
+    for ent in entities {
+		if entities[ent].status == .Active {
+			run_entity(&entities[ent])
 		}
 	}
 
@@ -120,18 +126,18 @@ vlf_run :: proc() {
     run_players()
 
     buff_id := ""
-    if info_item != nil {
-        buff_id = info_item^.id
+    if len(info_item) > 0 {
+        buff_id = info_item
     }
 
-    for i := 0; i < len(entities); i += 1 {
-		if entities[i].status != .Active {
-            if buff_id == entities[i].id {
-                info_item = nil
+    for ent in entities {
+		if entities[ent].status != .Active {
+            if buff_id == entities[ent].id {
+                info_item = ""
             } 
-			ordered_remove(&entities, i) 
-		} else if entities[i].id == buff_id {
-            info_item = &entities[i]
+			delete_key(&entities, ent)
+		} else if entities[ent].id == buff_id {
+            info_item = ent
         }
 	}
 
@@ -156,9 +162,9 @@ vlf_end :: proc() {
     delete(events)
 
     for ent in entities {
-        clear1 := ent.num_vars
+        clear1 := entities[ent].num_vars
         clear(&clear1)
-        clear2 := ent.str_vars
+        clear2 := entities[ent].str_vars
         clear(&clear2)
     }
 
@@ -180,7 +186,7 @@ vlf_test_init :: proc(ver:string) {
                 brn_a:f32 = rand.float32() * 360
                 b_key := "struck.brane"
 
-                append(&entities, Entity{
+                entities[brn_id] = Entity{
                     id = brn_id,
                     core = &entity_cores[b_key],
                     pos = { brn_x, brn_y },
@@ -198,7 +204,7 @@ vlf_test_init :: proc(ver:string) {
                     data = "BRANE",
                     parent = "",
                     owner = 0
-                })
+                }
             }
         case "proto1":
             pr_id := build_id(.Proto)
@@ -209,7 +215,7 @@ vlf_test_init :: proc(ver:string) {
             pr_key := "proto.Simple"
             pro_nvars := make(map[string]f32)
 
-            append(&entities, Entity{
+            entities[pr_id] = Entity{
                 id = pr_id,
                 core = &entity_cores[pr_key],
                 pos = { pr_x, pr_y },
@@ -224,10 +230,10 @@ vlf_test_init :: proc(ver:string) {
                 complexity = 1,
                 num_vars = pro_nvars,
                 str_vars = make(map[string]string),
-                data = "ABDACB",
+                data = "ABDACBCABAC",
                 parent = "",
                 owner = 0
-            })
+            }
 
             pr_id = build_id(.Proto)
             pr_x = mth.floor(rand.float32() * active_width)
@@ -236,7 +242,7 @@ vlf_test_init :: proc(ver:string) {
             pr_a = rand.float32() * 360
             pr_key = "proto.Complex"
 
-            append(&entities, Entity{
+            entities[pr_id] = Entity{
                 id = pr_id,
                 core = &entity_cores[pr_key],
                 pos = { pr_x, pr_y },
@@ -251,11 +257,106 @@ vlf_test_init :: proc(ver:string) {
                 complexity = 2,
                 num_vars = make(map[string]f32),
                 str_vars = make(map[string]string),
-                data = "AAAABD",
+                data = "ABDACBCABAC",
                 parent = "",
                 owner = 0
-            })
+            }
+        case "strand1":
+            str_id := build_id(.Strand)
+            str_x:f32 = mth.floor(rand.float32() * active_width)
+            str_y:f32 = mth.floor(rand.float32() * active_height)
+            str_v:f32 = 0
+            str_a:f32 = rand.float32() * 360
+            str_key := "strand.D"
+
+            entities[str_id] = Entity{
+                id = str_id,
+                core = &entity_cores[str_key],
+                pos = { str_x, str_y },
+                vel = { str_v, str_a },
+                dir = rand.float32() * 360,
+                gen = step,
+                age = 1,
+                status = .Active,
+                life = entity_cores[str_key].maxlife,
+                maxlife = entity_cores[str_key].maxlife,
+                decay = entity_cores[str_key].decay,
+                complexity = 0,
+                num_vars = make(map[string]f32),
+                str_vars = make(map[string]string),
+                data = "DAAAAABAACAADABDABGAAAGGGA",
+                parent = "",
+                owner = 0
+            }
     }
+}
+
+init_environment :: proc() {
+    q1:rl.Vector2 = { 0, 0 }
+    q2:rl.Vector2 = { 0, 0 }
+    r_set:int = int(mth.floor(rand.float32() * 4))
+
+    switch r_set {
+        case 0:
+            q1.x = 0
+            q1.y = 0
+            q2.x = active_width * 0.5
+            q2.y = active_height * 0.5
+        case 1:
+            q1.x = active_width * 0.5
+            q1.y = 0
+            q2.x = 0
+            q2.y = active_height * 0.5
+        case 2:
+            q1.x = 0
+            q1.y = active_height * 0.5
+            q2.x = active_width * 0.5
+            q2.y = 0
+        case 3:
+            q1.x = active_width * 0.5
+            q1.y = active_height * 0.5
+            q2.x = 0
+            q2.y = 0
+    }
+
+    p1_pos:rl.Vector2 = { q1.x + mth.floor(rand.float32() * active_width * 0.5), q1.y + mth.floor(rand.float32() * active_height * 0.5) }
+    p2_pos:rl.Vector2 = { q2.x + mth.floor(rand.float32() * active_width * 0.5), q2.y + mth.floor(rand.float32() * active_height * 0.5) }
+
+    p1_pos.x = (mth.floor(p1_pos.x / haze_w) * haze_w) + (haze_w * 0.5)
+    p1_pos.y = (mth.floor(p1_pos.y / haze_h) * haze_h) + (haze_h * 0.5)
+
+    p2_pos.x = (mth.floor(p2_pos.x / haze_w) * haze_w) + (haze_w * 0.5)
+    p2_pos.y = (mth.floor(p2_pos.y / haze_h) * haze_h) + (haze_h * 0.5)
+
+    p_id1:string = "capsule-001"
+    p_vars1 := make(map[string]string)
+    p_vars1["hover_text"] = "Slow Release Capsule x-28"
+    append(&items, Item{
+        id = p_id1,
+        i_type = .Capsule,
+        status = .Active,
+        pos = p1_pos,
+        vel = { 0, rand.float32() * 360 },
+        level = 0,
+        num_vars = make(map[string]f32),
+        str_vars = p_vars1,
+        owner = 0
+    })
+
+    p_id2:string = "capsule-002"
+    p_vars2 := make(map[string]string)
+    p_vars2["hover_text"] = "Slow Release Capsule x-92"
+    append(&items, Item{
+        id = p_id2,
+        i_type = .Capsule,
+        status = .Active,
+        pos = p2_pos,
+        vel = { 0, rand.float32() * 360 },
+        level = 0,
+        num_vars = make(map[string]f32),
+        str_vars = p_vars2,
+        owner = 0
+    })
 }
 
 info_click :: proc(pos:rl.Vector2) {
@@ -263,19 +364,20 @@ info_click :: proc(pos:rl.Vector2) {
     items := hash_find_2(pos,20)
     min_dist:f32 = -1
     found_item:bool = false
-    found_ptr:^Entity = nil
+    found_id:string = ""
 
-    for item in items {
-        dist := rl.Vector2Distance(item^.pos, pos)
+    for item_id in items {
+        item := &entities[item_id]
+        dist := rl.Vector2Distance(item.pos, pos)
         if min_dist < 0 || dist < min_dist {
             min_dist = dist
-            found_ptr = &(item^)
+            found_id = item.id
             found_item = true
         }
     }
 
     if found_item {
-        info_item = found_ptr
+        info_item = found_id
         info_item_timer = 400
     } else {
         info_item_timer = 0
@@ -293,12 +395,12 @@ run_events :: proc() {
 }
 
 run_event :: proc(event:^Event) {
-    switch event^.e_type {
+    switch event.e_type {
         case .Click:
             close_info()
         case .DoubleClick:
         case .Alt_Click:
-            info_click(event^.pos)
+            info_click(event.pos)
         case .PlayerAction1:
             if active_player >= 0 {
                 run_player_event(&players[active_player], .Activate)
@@ -312,8 +414,8 @@ run_event :: proc(event:^Event) {
 }
 
 close_info :: proc() {
-    if info_item != nil {
-        info_item =  nil
+    if len(info_item) > 0 {
+        info_item = ""
         info_item_timer = 0
     }
 }

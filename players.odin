@@ -55,7 +55,7 @@ max_reach:f32 = mth.floor(active_height * 0.5)
 player_dir_delta:f32 = mth.ceil(0.002 * active_height)
 player_reach_delta:f32 = mth.ceil(0.005 * active_height)
 
-start :: proc() {
+init_players :: proc() {
     add_player("System",0,{245,245,245,255}, { -100, -100 })
 }
 
@@ -94,17 +94,17 @@ run_players :: proc() {
 
 run_player :: proc(player:^Player) {
     if step %% 3 == 0 {
-        if player^.brane_count < max_brane_count {
+        if player.brane_count < max_brane_count {
             player^.brane_percent += 0.005
         }
 
-        if player^.num_vars["tool_timer"] > 0 {
+        if player.num_vars["tool_timer"] > 0 {
             player^.num_vars["tool_timer"] -= 1
         }
     }
 
-    if player^.brane_percent >= 1 {
-        if player^.brane_count < max_brane_count {
+    if player.brane_percent >= 1 {
+        if player.brane_count < max_brane_count {
             player^.brane_count += 1
         }
         player^.brane_percent = 0
@@ -114,23 +114,23 @@ run_player :: proc(player:^Player) {
 run_player_event :: proc(player:^Player, event:Player_Event) {
     switch event {
         case .Activate:
-            switch player^.tool {
+            switch player.tool {
                 case .None:
                 case .Brane:
 
-                    if player^.brane_count > 0 && player^.num_vars["tool_timer"] == 0 {
+                    if player.brane_count > 0 && player.num_vars["tool_timer"] == 0 {
                         br_id := build_id(.Struck)
                         br_key:string = "struck.brane"
 
-                        p_dist := player^.reach
-                        p_dir := player^.dir + 270
-                        br_pos := player^.pos
+                        p_dist := player.reach
+                        p_dir := player.dir + 270
+                        br_pos := player.pos
                         br_pos.x += p_dist * mth.cos(p_dir * mth.π / 180)
                         br_pos.y += p_dist * mth.sin(p_dir * mth.π / 180)
 
                         br_vel:rl.Vector2 = { 0, p_dir }
 
-                        append(&entities, Entity{
+                        entities[br_id] = Entity{
                             id = br_id,
                             core = &entity_cores[br_key],
                             pos = br_pos,
@@ -147,8 +147,8 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                             str_vars = make(map[string]string),
                             data = "BRANE",
                             parent = "",
-                            owner = player^.num
-                        })
+                            owner = player.num
+                        }
 
                         player^.num_vars["tool_timer"] = 36
                         player^.brane_count -= 1
@@ -156,36 +156,37 @@ run_player_event :: proc(player:^Player, event:Player_Event) {
                     }
     
                 case .Pulse:
-                    if player^.num_vars["tool_timer"] == 0 {
+                    if player.num_vars["tool_timer"] == 0 {
                         n_vars := make(map[string]f32)
                         n_vars["step"] = 0
                         n_vars["power"] = mth.ceil(active_height * 0.008)
 
-                        p_dist := player^.reach
+                        p_dist := player.reach
 
-                        p_dir := player^.dir + 270
-                        p_pos := player^.pos
+                        p_dir := player.dir + 270
+                        p_pos := player.pos
                         p_pos.x += p_dist * mth.cos(p_dir * mth.π / 180)
                         p_pos.y += p_dist * mth.sin(p_dir * mth.π / 180)
 
                         append(&items, Item{
-                            id = strings.concatenate({"p-", int_to_str(player^.num),"-shoot-", int_to_str(step)}),
+                            id = strings.concatenate({"p-", int_to_str(player.num),"-shoot-", int_to_str(step)}),
                             i_type = .Pulse,
                             status = .Active,
                             pos = p_pos,
                             vel = { 0, 0 },
+                            level = 1,
                             num_vars = n_vars,
                             str_vars = make(map[string]string),
-                            owner = player^.num
+                            owner = player.num
                         })
 
                         player^.num_vars["tool_timer"] = 3
                     }
                 case .Grab:
-                    if player^.num_vars["tool_timer"] == 0 {}
+                    if player.num_vars["tool_timer"] == 0 {}
             }
         case .Toggle:
-            switch player^.tool {
+            switch player.tool {
                 case .None:
                     player^.tool = .Brane
                 case .Brane:

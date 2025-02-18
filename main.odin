@@ -14,7 +14,9 @@ active_width:f32 = screen_width
 active_height:f32 = screen_height
 
 frame_rate:f32 = 400
+step_rate:f32 = 24
 delta:f32 = 0
+s_delta:f32 = 0
 
 mouse_button_state := []int{0,0}
 mouse_button_timer := []int{0,0}
@@ -126,18 +128,30 @@ main :: proc() {
 		}
 
 		delta += rl.GetFrameTime()
+		s_delta += rl.GetFrameTime()
+		runFrame := false
 		runStep := false
+
+		if s_delta >= 1 / step_rate {
+			s_delta = 0
+			runStep = true
+		}
 
 		if delta >= 1 / frame_rate {
 			delta = 0
-			runStep = true
+			runFrame = true
 		}
-		
-		if (runStep) {
-			// run game step
-			if runStep {
-				vlf_run()
-			}
+
+		// run game step
+		prev_step:int = step
+		if runStep {
+			vlf_run_step()
+		}
+		step_delta = step - prev_step
+
+		// run game frame
+		if runFrame {
+			vlf_run_frame()
 		}
 
 		{
